@@ -14,29 +14,29 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 // ── palette ──────────────────────────────────────────────────────────
+// colours for light water: tiles are tints of these, glyphs are a deep shade of the same hue
 const PAL = [
-  [132, 164, 162],  // 0 hammerhead: slate teal
-  [116, 128, 206],  // 1 mako: metallic indigo
-  [198, 160, 118],  // 2 nurse: tawny
-  [234, 110, 38],   // 3 koi orange
-  [236, 232, 222],  // 4 koi white
+  [112, 150, 150],  // 0 hammerhead: slate teal
+  [96, 110, 196],   // 1 mako: metallic indigo
+  [186, 146, 102],  // 2 nurse: tawny
+  [232, 110, 40],   // 3 koi orange
+  [214, 210, 200],  // 4 koi white: a warm grey, or it vanishes into the water
   [40, 38, 38],     // 5 koi black
-  [208, 50, 44],    // 6 kohaku red
-  [150, 176, 210],  // 7 sardine silver-blue
-  [172, 182, 178],  // 8 small grey fish
-  [150, 170, 180],  // 9 water: dust, wakes, ripples
+  [206, 52, 44],    // 6 kohaku red
+  [110, 140, 180],  // 7 sardine silver-blue
+  [140, 150, 146],  // 8 small grey fish
+  [120, 128, 130],  // 9 water: dust, wakes, ripples
 ];
 const GUIDE_DOT = { hammer: 0, mako: 1, koi: 3, koi2: 6, school: 7 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
-const WHITE = [255, 255, 255];
-// per colour: the body as is, the body lit (a called fish), and the colour of the light pool under a called fish
-const LOOK = PAL.map((c, i) => {
-  const base = i === 5 ? [70, 76, 84] : mix(c, WHITE, 0.08);   // the near-black koi patch turns deep slate so it reads on dark water
-  const m = (base[0] + base[1] + base[2]) / 3;
-  const hot = mix(base, WHITE, 0.16);                                            // lit: brighter, never acid
-  const glow = base.map(v => clamp(Math.round(m + (v - m) * 1.5), 0, 255));      // the pool: a little more chroma than the skin
-  return { base, ink: mix(base, WHITE, 0.45), hot, glow };
+const WHITE = [255, 255, 255], BLACK = [0, 0, 0];
+// per colour: the skin, the skin of a called fish (a touch deeper and more saturated), the glyph ink, and the tint of the
+// light pool under a called fish
+const LOOK = PAL.map(c => {
+  const m = (c[0] + c[1] + c[2]) / 3;
+  const hot = c.map(v => clamp(Math.round(m + (v - m) * 1.3 - 8), 0, 255));
+  return { base: c, hot, ink: mix(c, BLACK, 0.58), glow: mix(c, WHITE, 0.35) };
 });
 
 // glyphs: 0–8 tone ramp, 9 eye, 10–13 fin rays by direction, 14 dot
@@ -57,7 +57,7 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const small = W < 640;
   CW = small ? 5 : 6; CH = small ? 6 : 7;
-  scale = Math.max(0.38, Math.min(1.15, W / 1440)) * 1.45;
+  scale = Math.max(0.38, Math.min(1.15, W / 1440)) * 1.9;      // fish 1.3× larger than the first pass (client: «рыбок чуть побольше»)
   cols = Math.ceil(W / CW) + 1; rows = Math.ceil(H / CH) + 1;
   const n = cols * rows;
   val = new Float32Array(n); col = new Uint8Array(n); own = new Int16Array(n);
@@ -82,13 +82,13 @@ function paint(key) {
   const x = (key % SPR_COLS) * sw, y = ((key / SPR_COLS) | 0) * sh, v = lv / (LEVELS - 1), L = LOOK[c];
   const inset = Math.max(1, Math.round(dpr * 0.5));
   if (type === 0 || type === 1) {
-    // translucent tiles and a light glyph: value fades the cell in and out, so a cell a fish is leaving dims instead of switching off
-    actx.fillStyle = type ? rgba(L.hot, 0.24 + 0.56 * v) : rgba(L.base, 0.14 + 0.52 * v);
+    // translucent tiles and a deep glyph: value fades the cell in and out, so a cell a fish is leaving dims instead of switching off
+    actx.fillStyle = type ? rgba(L.hot, 0.3 + 0.58 * v) : rgba(L.base, 0.2 + 0.56 * v);
     actx.fillRect(x + inset * 0.5, y + inset * 0.5, sw - inset, sh - inset);
-    actx.fillStyle = type ? rgba(WHITE, 0.6 + 0.4 * v) : rgba(L.ink, 0.35 + 0.6 * v);
+    actx.fillStyle = rgba(L.ink, type ? 0.6 + 0.4 * v : 0.4 + 0.55 * v);
     actx.fillText(GLYPHS[g], x + sw / 2, y + sh / 2 + dpr * 0.5);
   } else {
-    actx.fillStyle = c === 9 ? rgba(L.base, 0.10 + 0.6 * v) : rgba(L.ink, 0.25 + 0.75 * v);
+    actx.fillStyle = c === 9 ? rgba(L.base, 0.14 + 0.56 * v) : rgba(L.ink, 0.3 + 0.7 * v);
     actx.fillText(GLYPHS[g], x + sw / 2, y + sh / 2);
   }
   painted[key] = 1;
@@ -100,7 +100,7 @@ function blit(type, c, lv, g, X, Y) {
 }
 for (const b of $$('[data-guide]')) {
   const c = PAL[GUIDE_DOT[b.dataset.guide]];
-  if (c) b.style.setProperty('--btn-fish', `rgb(${c.join(',')})`);
+  if (c) b.style.setProperty('--btn-fish', `rgb(${mix(c, BLACK, 0.35).join(',')})`);   // deep enough for borders and labels on light glass
 }
 
 // ── stamping into the grid ───────────────────────────────────────────
@@ -544,6 +544,8 @@ addEventListener('pageshow', () => {
 });
 addEventListener('pointermove', e => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.on = e.pointerType !== 'touch'; pointer.moved = clock; });
 document.addEventListener('pointerleave', () => pointer.on = false);
+// other scripts on the page can disturb the water (the fork example on the home page does when a fork appears)
+addEventListener('pond:ripple', e => { ripples.push({ x: e.detail.x, y: e.detail.y, r: 0, max: 150, speed: 110 }); wake(); });
 // a tap in open water: a ripple, and every fish near it bolts
 document.addEventListener('pointerdown', e => {
   if (e.target.closest('a,button,input,select,textarea,summary,label')) return;
@@ -579,13 +581,12 @@ function simulate(dt, t) {
   for (let i = 0; i < wakeB.length; i++) wakeB[i] *= k;
   for (const d of dust) { d.p += dt * 0.5; d.x += Math.sin(d.p + d.y * 0.01) * 3 * dt; d.y += Math.cos(d.p * 0.7 + d.x * 0.01) * 2.4 * dt; }
 }
-// a called fish swims in its own light: soft radial pools along the spine, added on top of the water, under the tiles
+// a called fish swims in its own light: soft tinted pools along the spine, laid on the water under the tiles
 function drawGlow() {
-  ctx.globalCompositeOperation = 'lighter';
   const breathe = 0.85 + 0.15 * Math.sin(clock * 0.004);
   for (const f of fish) {
     if (f.glow < 0.02) continue;
-    const c = LOOK[f.p ? f.p.col : f.c].glow, k = 0.2 * f.glow * breathe;
+    const c = LOOK[f.p ? f.p.col : f.c].glow, k = 0.3 * f.glow * breathe;
     const pools = f.f ? [[f.cx, f.cy, 90]] : [0.08, 0.28, 0.48, 0.68, 0.88].map(u => { const a = f.at(u); return [a.x, a.y, a.w * 2.8 + 30]; });
     for (const [x, y, r] of pools) {
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -593,7 +594,6 @@ function drawGlow() {
       ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
     }
   }
-  ctx.globalCompositeOperation = 'source-over';
 }
 function render(dt) {
   own.fill(-1);

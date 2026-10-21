@@ -2,7 +2,7 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 let lang='ru';try{lang=localStorage.getItem('devunion-language')||'ru'}catch{}
 $$('[data-en]').forEach(el=>el.dataset.ru=el.innerHTML);
-function language(next){lang=next==='en'?'en':'ru';document.documentElement.lang=lang;$$('[data-en]').forEach(el=>el.innerHTML=el.dataset[lang]);$('.lang').textContent=lang==='ru'?'EN':'RU';$('.lang').setAttribute('aria-label',lang==='ru'?'Switch to English':'Переключить на русский');try{localStorage.setItem('devunion-language',lang)}catch{};if($('#calculator'))calculate(false)}
+function language(next){lang=next==='en'?'en':'ru';document.documentElement.lang=lang;$$('[data-en]').forEach(el=>el.innerHTML=el.dataset[lang]);$('.lang').textContent=lang==='ru'?'EN':'RU';$('.lang').setAttribute('aria-label',lang==='ru'?'Switch to English':'Переключить на русский');try{localStorage.setItem('devunion-language',lang)}catch{};if($('#calculator'))calculate(false);forkDemo(false)}
 $('.lang').addEventListener('click',()=>language(lang==='ru'?'en':'ru'));
 const menu=$('#mobile-menu'),toggle=$('.menu-toggle');
 toggle.addEventListener('click',()=>{menu.showModal();toggle.setAttribute('aria-expanded','true');document.body.style.overflow='hidden';$('.menu-close').focus()});
@@ -15,5 +15,23 @@ function calculate(report=true){const odds=Number($('#c-odds')?.value),price=Num
 if($('#calculator')){$('#calculator').addEventListener('submit',e=>{e.preventDefault();calculate()});$$('#calculator input').forEach(el=>el.addEventListener('input',()=>calculate()));$('#calc-reset').addEventListener('click',()=>{ $('#calculator').reset();calculate()})}
 if($('#brief-form')){const form=$('#brief-form'),status=$('#brief-status');function brief(){if(!form.reportValidity())return null;const data=new FormData(form);return `DevUnion — ${lang==='ru'?'бриф проекта':'project brief'}\n\n${lang==='ru'?'Направление':'Service'}: ${data.get('service')}\n${lang==='ru'?'Задача':'Task'}: ${data.get('task')}\n${lang==='ru'?'Контакт':'Contact'}: ${data.get('contact')||'—'}\n`}
 form.addEventListener('submit',async e=>{e.preventDefault();const value=brief();if(!value)return;try{await navigator.clipboard.writeText(value);status.textContent=lang==='ru'?'Бриф скопирован. Ничего не отправлено.':'Brief copied. Nothing has been sent.'}catch{status.textContent=lang==='ru'?'Буфер недоступен. Используйте «Скачать бриф».':'Clipboard unavailable. Use Download brief.'}});$('#brief-download').addEventListener('click',()=>{const value=brief();if(!value)return;const url=URL.createObjectURL(new Blob([value],{type:'text/plain;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='DevUnion-brief.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent=lang==='ru'?'Бриф сохранён в файл. Ничего не отправлено.':'Brief saved to a file. Nothing has been sent.'})}
+// home "what we do": a live fork example. 1/k + p below one is a fork; the edge is what a split bank returns before fees.
+// When the sliders first cross into a fork, the pond gets a ripple beside the panel, as if something bit.
+const fdK=$('#fd-k'),fdP=$('#fd-p');let forkWas=null;
+function forkDemo(fromUser){if(!fdK)return;const k=+fdK.value,p=+fdP.value,s=1/k+p,fork=s<1,edge=(1/s-1)*100,fill=Math.min(s/1.4,1);
+const nf=(v,d)=>new Intl.NumberFormat(lang==='ru'?'ru-RU':'en-US',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
+$('#fd-k-out').textContent=nf(k,2);$('#fd-p-out').textContent=nf(p,2);$('#fd-formula').textContent=`1 / ${nf(k,2)} + ${nf(p,2)} = ${nf(s,3)}`;
+$('#fd-fill').style.width=fill*100+'%';$('.fork-demo').classList.toggle('is-fork',fork);
+$('#fd-status').textContent=fork?(lang==='ru'?`вилка +${nf(edge,1)}% до комиссий`:`fork +${nf(edge,1)}% before fees`):(lang==='ru'?'вилки нет':'no fork');
+if(fromUser&&fork&&forkWas===false){const r=$('.about-panel').getBoundingClientRect(),b=$('.fd-scale').getBoundingClientRect();dispatchEvent(new CustomEvent('pond:ripple',{detail:{x:r.right+70,y:b.top+b.height/2}}))}
+forkWas=fork}
+if(fdK)[fdK,fdP].forEach(el=>el.addEventListener('input',()=>forkDemo(true)));
+// the explainer opens on hover or focus, and a tap on its chip pins it open: on a phone, touching a slider would otherwise
+// move focus and close it mid-gesture. A tap anywhere else or Escape closes it.
+const about=$('.about-panel');
+if(about){$('.about-toggle').addEventListener('click',()=>about.classList.toggle('is-open'));document.addEventListener('pointerdown',e=>{if(!e.target.closest('.about-panel'))about.classList.remove('is-open')});about.addEventListener('keydown',e=>{if(e.key==='Escape'){about.classList.remove('is-open');about.blur()}})}
+// home ring: hovering or focusing a station slides the lit arc round the dial to it, in that fish's colour
+const arc=$('.ring-arc');
+if(arc)$$('.ring-item').forEach(it=>{const on=()=>{const cs=getComputedStyle(it),a=parseFloat(cs.getPropertyValue(matchMedia('(max-width:640px)').matches?'--am':'--a'));arc.style.setProperty('--arc-from',(a+90-20)+'deg');arc.style.setProperty('--arc-color',cs.getPropertyValue('--btn-fish')||'var(--fish)');arc.classList.add('is-lit')},off=()=>arc.classList.remove('is-lit');it.addEventListener('pointerenter',on);it.addEventListener('focus',on);it.addEventListener('pointerleave',off);it.addEventListener('blur',off)});
 language(lang);
 })();
