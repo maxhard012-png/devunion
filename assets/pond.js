@@ -157,7 +157,7 @@ const lerpTable = (t, u) => {
 const PLANS = {
   hammer: { len: 300, speed: 46, turn: 0.9, wander: 0.32, wave: 0.05, col: 0, depth: 3, gait: 'cruise',
     body: [[0, .02], [.05, .03], [.1, .045], [.28, .068], [.45, .058], [.65, .034], [.84, .013], [1, .006]] },
-  mako: { len: 250, speed: 70, turn: 1.1, wander: 0.38, wave: 0.045, col: 1, depth: 2.6, gait: 'cruise',
+  mako: { len: 250, speed: 55, turn: 1.1, wander: 0.38, wave: 0.045, col: 1, depth: 2.6, gait: 'cruise',
     body: [[0, 0], [.06, .025], [.16, .05], [.32, .066], [.5, .05], [.7, .028], [.84, .011], [1, .005]] },
   nurse: { len: 270, speed: 28, turn: 0.75, wander: 0.28, wave: 0.06, col: 2, depth: 2.2, gait: 'cruise',
     body: [[0, .04], [.04, .062], [.2, .085], [.4, .08], [.6, .055], [.8, .03], [1, .012]] },
@@ -196,6 +196,8 @@ class Fish {
     this.v = this.p.speed; this.omega = 0; this.phase = Math.random() * TAU; this.amp = 1;
     this.kickT = Math.random(); this.heading = this.a; this.nextTurn = 0; this.stroke = 1; this.power = 1; this.foamAcc = 0; this.fin = 0.5; this.glow = 0; this.mode = 'free'; this.z = 0.5; this.startle = 0;
     this.nibbleT = 0;
+    // the long script: pace changes, koi lingering, and leaving the frame to come back elsewhere
+    this.pace = 1; this.paceGoal = 1; this.paceT = 0; this.linger = 0; this.away = false; this.awayT = 0; this.enteredAt = 0; this.bold = Math.random() < 0.7;
     this.sx = new Float32Array(SEG); this.sy = new Float32Array(SEG); this.nx = new Float32Array(SEG); this.ny = new Float32Array(SEG);
     this.rescale(); this.resetTrail();
   }
@@ -205,16 +207,50 @@ class Fish {
     for (let i = 0; i < 300; i++) this.trail.push([this.x - Math.cos(this.a) * i * 2, this.y - Math.sin(this.a) * i * 2]);
   }
   pickTarget() {}   // kept for callers: free swimming no longer chases random points
+  // fully out of the frame, head and tail: the fish is gone for a while instead of looping round just past the edge
+  offscreen() {
+    const out = (x, y) => x < -30 || x > W + 30 || y < -30 || y > H + 30;
+    return out(this.x, this.y) && out(this.sx[SEG - 1], this.sy[SEG - 1]);
+  }
+  // come back across a random edge (or the edge nearest a calling element), already swimming in, body trailing outside
+  reenter(t, toward) {
+    let ex, ey, tx, ty;
+    if (toward) {
+      const r = toward.getBoundingClientRect(); tx = r.left + r.width / 2; ty = r.top + r.height / 2;
+      const d = [tx, W - tx, ty, H - ty], e = d.indexOf(Math.min(...d));
+      ex = e === 0 ? 0 : e === 1 ? W : tx; ey = e === 2 ? 0 : e === 3 ? H : ty;
+    } else {
+      const e = Math.random() * 2 * (W + H), m = this.L * 0.1;
+      if (e < W) { ex = e; ey = -m; } else if (e < W + H) { ex = W + m; ey = e - W; } else if (e < 2 * W + H) { ex = e - W - H; ey = H + m; } else { ex = -m; ey = e - 2 * W - H; }
+      tx = W * (0.2 + Math.random() * 0.6); ty = H * (0.2 + Math.random() * 0.6);
+    }
+    this.a = this.heading = Math.atan2(ty - ey, tx - ex);
+    this.x = ex - Math.cos(this.a) * this.L * 0.1; this.y = ey - Math.sin(this.a) * this.L * 0.1;
+    this.omega = 0; this.v = this.p.speed; this.nextTurn = t + 4000; this.enteredAt = t;
+    this.away = false; this.bold = Math.random() < 0.7;
+    this.resetTrail();
+  }
   // Steering works on angular velocity, never on heading directly: every turn eases in and out, so paths are curves, not corners.
   steer(dt, t) {
     const p = this.p, L = this.L;
     let want = p.speed, turnMax = p.turn, resp = 1.6;
+    const sharkish = p.gait === 'cruise';
+    // 0. Every 8–20 s the fish changes pace (unhurried, normal, brisk); now and then a koi lingers in one spot for a while,
+    //    pottering about slowly. Over a minute no two fish follow the same rhythm.
+    if (t > this.paceT) {
+      const r = Math.random();
+      this.paceGoal = r < 0.3 ? 0.65 : r < 0.8 ? 1 : 1.2;
+      this.paceT = t + 8000 + Math.random() * 12000;
+      this.linger = !sharkish && r < 0.22 ? t + 6000 + Math.random() * 8000 : 0;
+    }
+    this.pace += (this.paceGoal - this.pace) * Math.min(1, dt * 0.5);
+    const lingering = t < this.linger;
+    want *= lingering ? 0.45 : this.pace;
     // 1. Seen from above a fish swims nearly straight and turns in decisions: pick a new heading, ease into it, go straight again.
     // A long steady turn rate instead draws arcs and loops, which read as a body thrown and falling, i.e. side view.
     if (t > this.nextTurn) {
-      const sharkish = p.gait === 'cruise';
-      this.heading = this.a + (Math.random() < 0.5 ? -1 : 1) * (0.4 + Math.random() * (sharkish ? 0.7 : 1.3));
-      this.nextTurn = t + (sharkish ? 4000 + Math.random() * 5000 : 2500 + Math.random() * 3500);
+      this.heading = this.a + (Math.random() < 0.5 ? -1 : 1) * (lingering ? 0.7 + Math.random() * 1.2 : 0.4 + Math.random() * (sharkish ? 0.7 : 1.3));
+      this.nextTurn = t + (lingering ? 1500 + Math.random() * 2000 : sharkish ? 5000 + Math.random() * 6000 : 3000 + Math.random() * 3500);
       if (!sharkish) this.kickT = 0;          // a koi turns with a stroke
     }
     let target = clamp(angDiff(this.heading, this.a) * 1.4, -turnMax * 0.6, turnMax * 0.6)
@@ -222,7 +258,7 @@ class Fish {
     let goal = null, weight = 0;
     // 2. soft walls: fish may cross the frame and turn back off-screen, the way a pond seen from above is framed; only a look-ahead
     //    well past the edge turns them home
-    const look = L * 0.3 + this.v * 0.8, lx = this.x + Math.cos(this.a) * look, ly = this.y + Math.sin(this.a) * look, m = -L * 0.35;
+    const look = L * 0.3 + this.v * 0.8, lx = this.x + Math.cos(this.a) * look, ly = this.y + Math.sin(this.a) * look, m = this.bold ? -L * 0.95 : -L * 0.35;
     const over = Math.max(m - lx, lx - (W - m), m - ly, ly - (H - m), 0);
     if (over > 0) {
       if (!this.home || this.homeT < t) { this.home = [W * (0.12 + Math.random() * 0.76), H * (0.12 + Math.random() * 0.76)]; this.homeT = t + 4000; }
@@ -572,7 +608,16 @@ function simulate(dt, t) {
       if (f.mode === 'call' && f.arrive) { const r = f.btn.getBoundingClientRect(); if (Math.hypot(f.cx - r.left - r.width / 2, f.cy - r.top - r.height / 2) < 50) f.arrive(); }
       continue;
     }
+    if (f.away) {
+      f.awayT -= dt;
+      if (f.awayT > 0 && f.mode === 'free') continue;
+      f.reenter(t, f.mode !== 'free' ? f.btn : null);
+    }
+    // called while entirely out of the frame: come in across the edge nearest the calling element instead of a long way round
+    else if (f.mode !== 'free' && f.offscreen() && !f.reentered) { f.reenter(t, f.btn); f.reentered = true; }
+    if (f.mode === 'free') f.reentered = false;
     f.steer(dt, t); f.move(dt, t);
+    if (f.mode === 'free' && t - f.enteredAt > 3000 && f.offscreen()) { f.away = true; f.awayT = 2 + Math.random() * 8; continue; }
     if (f.mode === 'call' && f.arrive) { const r = f.btn.getBoundingClientRect(); if (Math.hypot(f.x - r.left - r.width / 2, f.y - r.top - r.height / 2) < 30) f.arrive(); }
   }
   for (let i = foam.length - 1; i >= 0; i--) {
@@ -589,7 +634,7 @@ function simulate(dt, t) {
 function drawGlow() {
   const breathe = 0.85 + 0.15 * Math.sin(clock * 0.004);
   for (const f of fish) {
-    if (f.glow < 0.02) continue;
+    if (f.glow < 0.02 || f.away) continue;
     const c = LOOK[f.p ? f.p.col : f.c].glow, k = 0.3 * f.glow * breathe;
     const pools = f.f ? [[f.cx, f.cy, 90]] : [0.08, 0.28, 0.48, 0.68, 0.88].map(u => { const a = f.at(u); return [a.x, a.y, a.w * 2.8 + 30]; });
     for (const [x, y, r] of pools) {
@@ -601,7 +646,7 @@ function drawGlow() {
 }
 function render(dt) {
   own.fill(-1);
-  for (const f of fish) f.draw();
+  for (const f of fish) if (!f.away) f.draw();
   for (const r of ripples) {
     const n = Math.ceil(r.r * 0.5) + 8, a = 1 - r.r / r.max;
     for (let i = 0; i < n; i++) { const th = i / n * TAU; stampWake(r.x + Math.cos(th) * r.r, r.y + Math.sin(th) * r.r * 0.8, 0.9 * a); }
