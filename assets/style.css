@@ -1,0 +1,279 @@
+/* DevUnion — one stylesheet for the whole site. Dark water, fish from assets/pond.js, glass on top. */
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;src:url('fonts/jetbrainsmono-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2190-2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;src:url('fonts/jetbrainsmono-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Onest';font-style:normal;font-weight:100 900;font-display:swap;src:url('fonts/onest-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2190-2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Onest';font-style:normal;font-weight:100 900;font-display:swap;src:url('fonts/onest-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+
+:root{
+  --water:#07090c; --haze:rgba(60,110,140,.14);
+  --ink:#eceee9; --ink2:#a6abb0; --ink3:#767c83;
+  --glass:rgba(12,16,21,.58); --glass-strong:rgba(14,19,25,.82); --edge:rgba(230,240,245,.11); --edge2:rgba(230,240,245,.22);
+  --fish:#f28a4a;                       /* each page sets its own fish colour on <body> */
+  --danger:#ff7a6b;
+  --display:'Onest',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --gutter:clamp(16px,4vw,48px); --wrap:1180px; --r:12px;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;background:var(--water);color:var(--ink);font:400 16px/1.55 var(--display)}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 50% 42% at 50% 45%,var(--haze),transparent 70%)}
+a{color:inherit}
+h1,h2,p{margin:0}
+::selection{background:var(--fish);color:var(--water)}
+:focus-visible{outline:2px solid var(--fish);outline-offset:3px}
+
+#pond{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+#pond{transition:opacity 1.4s ease}
+#pond:not(.is-ready){opacity:0}       /* the pond fades in once the first frame is drawn, instead of popping */
+.page #pond{opacity:.85}               /* inner pages: the pond is a backdrop, a step behind the content */
+.page{display:flex;flex-direction:column}   /* short pages keep the footer at the bottom */
+.page .page-main{flex:1}
+
+.skip{position:absolute;left:12px;top:-60px;z-index:20;padding:10px 14px;background:var(--ink);color:var(--water);border-radius:8px;text-decoration:none}
+.skip:focus{top:12px}
+
+/* ── shared chrome ──────────────────────────────────────────────────── */
+.site-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:28px;padding:16px var(--gutter);
+  background:linear-gradient(var(--water),rgba(7,9,12,.0));}
+.home .site-header{position:fixed;left:0;right:0;background:none}
+.brand{font:600 16px/1 var(--display);letter-spacing:-.01em;text-decoration:none}
+.desktop-nav{display:flex;gap:4px;margin-left:auto}
+.desktop-nav a{font:500 13px/1 var(--mono);color:var(--ink2);text-decoration:none;padding:9px 12px;border-radius:8px}
+.desktop-nav a:hover{color:var(--ink);background:var(--glass)}
+.desktop-nav a[aria-current="page"]{color:var(--ink);background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge)}
+.header-actions{display:flex;gap:8px}
+.lang,.menu-toggle,.menu-close{font:500 12px/1 var(--mono);color:var(--ink2);background:var(--glass);border:1px solid var(--edge);border-radius:8px;padding:9px 12px;cursor:pointer;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.lang:hover,.menu-toggle:hover{color:var(--ink);border-color:var(--edge2)}
+.menu-toggle{display:none}
+
+.mobile-menu{width:100%;max-width:none;height:100%;max-height:none;margin:0;padding:16px var(--gutter);border:0;background:rgba(7,9,12,.94);color:var(--ink)}
+.mobile-menu::backdrop{background:rgba(0,0,0,.5)}
+.mobile-top{display:flex;justify-content:space-between;align-items:center}
+.menu-close{font-size:18px;padding:6px 12px}
+.mobile-menu nav{display:flex;flex-direction:column;gap:2px;margin-top:40px}
+.mobile-menu nav a{font:300 34px/1.25 var(--display);letter-spacing:-.02em;text-decoration:none;padding:6px 0}
+.mobile-menu nav a.button{margin-top:24px;font:600 15px/1 var(--display);align-self:flex-start}
+
+.site-footer{position:relative;z-index:1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 22px;padding:28px var(--gutter);font:500 12px/1 var(--mono);color:var(--ink3)}
+.site-footer a{color:var(--ink2);text-decoration:none}
+.site-footer a:hover{color:var(--ink)}
+.footer-name{margin-left:auto}
+
+/* ── shared pieces ──────────────────────────────────────────────────── */
+.eyebrow{font:500 11px/1.3 var(--mono);letter-spacing:.12em;color:var(--fish)}
+.button{display:inline-flex;align-items:center;gap:8px;font:600 15px/1 var(--display);color:var(--water);background:var(--fish);border:0;border-radius:10px;padding:14px 18px;text-decoration:none;cursor:pointer;transition:filter .2s,transform .2s}
+.button:hover{filter:brightness(1.12);transform:translateY(-1px)}
+.reset,.small-link{font:500 13px/1 var(--mono);color:var(--ink2);background:none;border:0;padding:14px 4px;cursor:pointer;text-decoration:none}
+.reset:hover,.small-link:hover{color:var(--ink)}
+.small-link{border-bottom:1px solid var(--edge2);padding:6px 0}
+.glass{background:var(--glass);border:1px solid var(--edge);border-radius:var(--r);-webkit-backdrop-filter:blur(12px) saturate(1.2);backdrop-filter:blur(12px) saturate(1.2)}
+
+.page-main{position:relative;z-index:1;width:min(var(--wrap),100%);margin:0 auto;padding:clamp(40px,8vh,96px) var(--gutter) 64px;overflow-x:clip}   /* the blur behind headings may reach past the screen edge */
+.page-heading{position:relative;max-width:760px;margin-bottom:clamp(36px,6vh,64px)}
+/* soft deep water behind every block of free-standing copy: fish passing under it blur instead of fighting the letters */
+.hero-intro::before,.page-heading::before,.product-hero::before{content:"";position:absolute;inset:-60px -120px -50px -90px;z-index:-1;pointer-events:none;
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  -webkit-mask:radial-gradient(closest-side,#000 50%,transparent);mask:radial-gradient(closest-side,#000 50%,transparent)}
+.page-heading h1,.product-hero h1{margin-top:14px;font:300 clamp(36px,5.4vw,68px)/1.02 var(--display);letter-spacing:-.035em}
+.intro{margin-top:18px;max-width:52ch;font-size:18px;color:var(--ink2)}
+.page-next,.page-actions{display:flex;flex-wrap:wrap;align-items:center;gap:16px 24px;margin-top:48px}
+
+/* notes are the same content block, laid out differently per page */
+.note{position:relative;padding:26px 26px 28px;background:var(--glass);border:1px solid var(--edge);border-radius:var(--r);-webkit-backdrop-filter:blur(12px) saturate(1.2);backdrop-filter:blur(12px) saturate(1.2)}
+.note-index{display:block;font:500 12px/1 var(--mono);color:var(--fish);margin-bottom:22px}
+.note h2{font:500 22px/1.2 var(--display);letter-spacing:-.015em}
+.note p{margin-top:12px;color:var(--ink2);max-width:46ch}
+
+.motion-ready .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s cubic-bezier(.2,.8,.2,1) var(--reveal-delay,0ms),transform .6s cubic-bezier(.2,.8,.2,1) var(--reveal-delay,0ms)}
+.motion-ready .reveal.is-visible{opacity:1;transform:none}
+
+/* ── home: name top-left, what we do bottom-left, sections as cards on the right; the water between belongs to the fish ── */
+.home-main{position:relative;z-index:2;overflow-x:clip}   /* the blur behind the copy may reach past the screen edge */
+.home .site-header .brand{visibility:hidden}               /* the page title is the name */
+.pond-hero{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,400px);grid-template-rows:auto 1fr auto;gap:32px 48px;padding:92px var(--gutter) 76px;pointer-events:none}
+.pond-hero>*{pointer-events:auto}
+.hero-intro{grid-column:1;grid-row:1;position:relative;max-width:640px}
+.hero-title{font:300 clamp(64px,10vw,152px)/.88 var(--display);letter-spacing:-.06em}
+.hero-lead{margin-top:20px;max-width:34ch;font-size:18px;color:var(--ink2)}
+
+/* a swatch of three tiles, the way the fish itself is drawn */
+.card-swatch{flex:none;width:6px;height:7px;border-radius:1px;background:var(--btn-fish);margin-right:16px;box-shadow:8px 0 color-mix(in srgb,var(--btn-fish) 60%,transparent),16px 0 color-mix(in srgb,var(--btn-fish) 28%,transparent)}
+
+.brief-button{display:inline-flex;align-items:center;gap:10px;margin-top:28px;padding:14px 18px;font:600 15px/1 var(--display);text-decoration:none;
+  background:rgba(255,255,255,.06);border:1px solid var(--edge2);border-radius:12px;-webkit-backdrop-filter:blur(12px) saturate(1.2);backdrop-filter:blur(12px) saturate(1.2);
+  transition:background-color .2s,border-color .2s}
+.brief-button .card-swatch{margin-right:16px}   /* the swatch draws two more tiles to its right */
+.brief-button>span:last-child{color:var(--ink2);transition:transform .2s,color .2s}
+.brief-button:hover,.brief-button:focus-visible,.brief-button.is-called{background:rgba(255,255,255,.1);border-color:var(--btn-fish)}
+.brief-button:hover>span:last-child{color:var(--ink);transform:translate(2px,-2px)}
+
+/* "what we do" stays folded into a chip until hovered or focused, so the water keeps the space; it opens upward */
+.about-panel{grid-column:1;grid-row:3;align-self:end;justify-self:start;position:relative;outline:none}
+.about-toggle{display:inline-flex;align-items:center;gap:12px;padding:12px 16px;color:var(--ink2);cursor:default;
+  background:var(--glass);border:1px solid var(--edge2);border-radius:999px;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);transition:border-color .2s,color .2s}
+.about-plus{font:400 16px/1 var(--mono);color:var(--fish);transition:transform .25s}
+.about-body{position:absolute;left:0;bottom:calc(100% + 10px);width:min(500px,calc(100vw - 2 * var(--gutter)));padding:22px 24px;
+  background:var(--glass-strong);border:1px solid var(--edge);border-radius:16px;-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);
+  opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .25s,transform .25s cubic-bezier(.2,.8,.2,1),visibility 0s .25s}
+.about-body::after{content:"";position:absolute;left:0;right:0;top:100%;height:12px}   /* hover bridge to the chip */
+.about-panel:hover .about-toggle,.about-panel:focus-within .about-toggle{color:var(--ink);border-color:var(--fish)}
+.about-panel:hover .about-plus,.about-panel:focus-within .about-plus{transform:rotate(45deg)}
+.about-panel:hover .about-body,.about-panel:focus-within .about-body{opacity:1;visibility:visible;transform:none;transition:opacity .25s,transform .25s cubic-bezier(.2,.8,.2,1)}
+.about-panel:focus-visible .about-toggle{outline:2px solid var(--fish);outline-offset:3px}
+.about-lead{font-size:15px;line-height:1.55}
+.about-lead code{font:500 14px/1 var(--mono);color:var(--fish);white-space:nowrap}
+.about-list{list-style:none;margin:16px 0 0;padding:0}
+.about-list li{display:grid;grid-template-columns:78px minmax(0,1fr);gap:12px;padding:9px 0;border-top:1px solid var(--edge);font-size:14px;color:var(--ink2)}
+.about-list b{font-weight:500;color:var(--ink)}
+.about-panel .small-link{display:inline-block;margin-top:14px}
+
+/* sections: each one its own card with a round go-button, so it reads as something to press, not a list */
+.section-cards{grid-column:2;grid-row:1/4;align-self:center;display:flex;flex-direction:column;gap:10px}
+.cards-head{margin-bottom:4px;font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.hint-touch{display:none}
+@media (hover:none){.hint-pointer{display:none}.hint-touch{display:inline}}
+.section-card{display:grid;grid-template-columns:30px minmax(0,1fr) auto 40px;align-items:center;gap:12px;padding:16px 16px 16px 20px;text-decoration:none;
+  background:var(--glass);border:1px solid var(--edge);border-radius:14px;-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);
+  transition:transform .25s cubic-bezier(.2,.8,.2,1),border-color .2s,background-color .2s}
+.section-card .card-swatch{margin:0}
+.card-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+.card-text b{font:500 19px/1.15 var(--display);letter-spacing:-.02em}
+.card-text small{font-size:13px;color:var(--ink2)}
+.card-species{font:500 11px/1 var(--mono);color:var(--btn-fish);white-space:nowrap}
+.card-go{width:40px;height:40px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--edge2);color:var(--ink2);transition:background-color .2s,color .2s,border-color .2s}
+.section-card:hover,.section-card:focus-visible,.section-card.is-called{transform:translateX(-4px);background:var(--glass-strong);border-color:var(--btn-fish)}
+.section-card:hover .card-go,.section-card:focus-visible .card-go,.section-card.is-called .card-go,
+.catalog-row:hover .card-go,.catalog-row:focus-visible .card-go,.catalog-row.is-called .card-go{background:var(--btn-fish);border-color:var(--btn-fish);color:var(--water)}
+.section-card:focus-visible{outline-color:var(--btn-fish)}
+
+/* a full-screen pond only where it fits; elsewhere the home page scrolls like any other */
+@media (min-width:861px) and (min-height:760px){
+  .home{overflow:hidden;height:100vh}
+  .pond-hero{height:100vh}
+  .home .site-footer{position:fixed;left:0;right:0;bottom:0;justify-content:center;pointer-events:none;padding:18px var(--gutter)}
+  .home .site-footer a{pointer-events:auto}
+  .home .footer-name{margin-left:0}
+}
+
+/* ── products: catalogue rows that call their fish ──────────────────── */
+.catalog{display:flex;flex-direction:column;gap:10px}
+.catalog-row{display:grid;grid-template-columns:36px 30px minmax(0,1fr) minmax(0,1.5fr) 96px 44px;align-items:center;gap:20px;padding:22px 22px 22px 28px;text-decoration:none;
+  background:var(--glass);border:1px solid var(--edge);border-radius:var(--r);-webkit-backdrop-filter:blur(12px) saturate(1.2);backdrop-filter:blur(12px) saturate(1.2);
+  transition:border-color .25s,background-color .25s}
+.catalog-row:hover,.catalog-row:focus-visible,.catalog-row.is-called{background:var(--glass-strong);border-color:var(--btn-fish,var(--edge2))}
+.row-id{font:500 12px/1 var(--mono);color:var(--btn-fish,var(--fish))}
+.row-name{font:400 clamp(24px,2.6vw,34px)/1.05 var(--display);letter-spacing:-.025em}
+.row-description{color:var(--ink2)}
+.row-tag{justify-self:end;font:500 11px/1 var(--mono);letter-spacing:.1em;color:var(--ink3);border:1px solid var(--edge);border-radius:6px;padding:7px 9px}
+.catalog-row .card-swatch{margin:0}
+
+/* ── services: three cards stepping down ────────────────────────────── */
+.notes-steps{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));row-gap:14px}
+.notes-steps .note:nth-child(1){grid-column:1/7}
+.notes-steps .note:nth-child(2){grid-column:4/10}
+.notes-steps .note:nth-child(3){grid-column:7/13}
+
+/* ── AUSPEX: giant name, statement, three columns ───────────────────── */
+.product-hero{position:relative;margin-bottom:40px}
+.product-hero h1{font-size:clamp(64px,13vw,184px);font-weight:200;letter-spacing:-.06em;line-height:.9;color:var(--fish)}
+.product-statement{display:grid;grid-template-columns:auto minmax(0,1fr);gap:28px;align-items:start;max-width:880px;padding:28px 30px;margin-bottom:24px;
+  background:var(--glass);border:1px solid var(--edge);border-left:2px solid var(--fish);border-radius:var(--r);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.signal-glyph{font:500 22px/1.2 var(--mono);color:var(--fish);white-space:nowrap}
+.product-statement p{font-size:19px;line-height:1.5}
+.notes-columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+
+/* ── bot: a timeline ────────────────────────────────────────────────── */
+.notes-timeline{position:relative;display:flex;flex-direction:column;gap:18px;max-width:760px;padding-left:56px}
+.notes-timeline::before{content:"";position:absolute;left:17px;top:20px;bottom:20px;width:1px;background:linear-gradient(var(--fish),var(--edge))}
+.notes-timeline .note-index{position:absolute;left:-56px;top:22px;width:35px;height:35px;display:grid;place-items:center;margin:0;border-radius:50%;background:var(--water);border:1px solid var(--fish)}
+
+/* ── how: the formula is the hero ───────────────────────────────────── */
+.formula{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;padding:clamp(36px,7vw,72px) 24px;margin-bottom:24px;
+  background:var(--glass);border:1px solid var(--edge);border-radius:calc(var(--r) * 1.5);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.formula strong{font:300 clamp(40px,8vw,104px)/1 var(--mono);letter-spacing:-.04em;color:var(--fish)}
+.formula p{max-width:46ch;color:var(--ink2)}
+
+/* ── faq: heading pinned left, answers right ────────────────────────── */
+.faq-layout{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr);gap:clamp(32px,6vw,80px);align-items:start}
+.faq-layout .page-heading{position:sticky;top:110px;margin:0}
+.faq-list{display:flex;flex-direction:column;gap:8px}
+.faq-item{background:var(--glass);border:1px solid var(--edge);border-radius:var(--r);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);transition:border-color .2s}
+.faq-item[open]{border-color:var(--edge2)}
+.faq-item summary{display:grid;grid-template-columns:36px minmax(0,1fr) 24px;align-items:center;gap:12px;padding:20px 22px;cursor:pointer;list-style:none;font:500 17px/1.3 var(--display)}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-plus{font:400 22px/1 var(--mono);color:var(--fish);transition:transform .25s;justify-self:end}
+.faq-item[open] .faq-plus{transform:rotate(45deg)}
+.faq-item p{padding:0 22px 22px 70px;color:var(--ink2)}
+
+/* ── calculator ─────────────────────────────────────────────────────── */
+.calculator-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch}
+.calc-inputs,.calc-result{padding:30px;background:var(--glass);border:1px solid var(--edge);border-radius:var(--r);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.calc-field{display:flex;flex-direction:column;gap:8px;margin-top:22px}
+.calc-field label,#brief-form label{font:500 12px/1.3 var(--mono);color:var(--ink2)}
+input,select,textarea{width:100%;font:400 18px/1.3 var(--display);color:var(--ink);background:rgba(0,0,0,.35);border:1px solid var(--edge);border-radius:10px;padding:13px 14px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--fish);box-shadow:0 0 0 3px color-mix(in srgb,var(--fish) 25%,transparent)}
+input[aria-invalid="true"]{border-color:var(--danger)}
+.field-error{font:500 12px/1.3 var(--mono);color:var(--danger);min-height:1em}
+.calc-actions{display:flex;gap:12px;align-items:center;margin-top:26px}
+.calc-note{margin-top:22px;font-size:13px;color:var(--ink3)}
+.calc-result{display:flex;flex-direction:column;background:var(--glass-strong)}
+.calc-result h2{font:500 12px/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+.profit{display:block;margin:14px 0 26px;font:300 clamp(48px,6vw,80px)/1 var(--display);letter-spacing:-.04em;color:var(--ink);font-variant-numeric:tabular-nums}   /* not the fish colour: on this page it is red, and red reads as a loss */
+.result-line{display:flex;justify-content:space-between;gap:16px;padding:13px 0;border-top:1px solid var(--edge)}
+.result-line span{color:var(--ink2)}
+.result-line b{font:500 15px/1.3 var(--mono);font-variant-numeric:tabular-nums}
+.allocation{display:flex;gap:3px;height:10px;margin-top:22px}
+.allocation i{display:block;height:100%;border-radius:3px;transition:width .4s cubic-bezier(.2,.8,.2,1)}
+#allocation-book{background:var(--fish)}
+#allocation-pred{background:#94b3da}
+.allocation-legend{display:flex;justify-content:space-between;margin-top:8px;font:500 11px/1 var(--mono);color:var(--ink3)}
+#calc-status{margin-top:auto;padding-top:22px;font-size:14px;color:var(--ink2)}
+
+/* ── contact ────────────────────────────────────────────────────────── */
+.brief-layout{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr);gap:14px;align-items:start}
+.brief-notice{padding:26px;border-radius:var(--r);border:1px dashed var(--edge2);color:var(--ink2);font-size:15px}
+#brief-form{display:flex;flex-direction:column;gap:10px;padding:30px;background:var(--glass);border:1px solid var(--edge);border-radius:var(--r);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+#brief-form label:not(:first-child){margin-top:12px}
+textarea{resize:vertical;min-height:140px}
+.form-hint{font-size:13px;color:var(--ink3)}
+#brief-form .page-actions{margin-top:18px}
+#brief-status{font-size:14px;color:var(--fish);min-height:1.4em}
+
+/* ── narrow screens ─────────────────────────────────────────────────── */
+@media (max-width:860px){
+  .desktop-nav{display:none}
+  .menu-toggle{display:block}
+  .header-actions{margin-left:auto}
+  .catalog-row{grid-template-columns:30px minmax(0,1fr) 44px;gap:6px 14px;padding:20px 18px}
+  .row-id,.row-tag{display:none}
+  .catalog-row .card-swatch{grid-row:1}
+  .row-description{grid-column:2/3;grid-row:2}
+  .catalog-row .card-go{grid-column:3;grid-row:1/3}
+  .notes-steps .note:nth-child(n){grid-column:1/-1}
+  .notes-steps .note:nth-child(2){margin-left:8%}
+  .notes-steps .note:nth-child(3){margin-left:16%}
+  .notes-columns,.calculator-layout,.brief-layout,.faq-layout{grid-template-columns:minmax(0,1fr)}
+  .faq-layout .page-heading{position:static}
+  .product-statement{grid-template-columns:minmax(0,1fr);gap:14px}
+  .footer-name{margin-left:0}
+  .pond-hero{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;row-gap:36px;padding-top:96px;padding-bottom:48px}
+  .hero-intro,.about-panel,.section-cards{grid-column:1;grid-row:auto}
+  .section-cards{order:1}            /* on a phone the sections come right after the brief, the explainer after them */
+  .about-panel{order:2}
+  .about-body{position:static;width:auto;margin-top:10px;display:none}   /* on a phone it opens in place, under the chip */
+  .about-panel:focus-within .about-body{display:block}
+  .card-species{display:none}
+  .section-card{grid-template-columns:30px minmax(0,1fr) 40px}
+}
+@media (max-width:640px){
+  .faq-item p{padding-left:22px}
+  .notes-timeline{padding-left:48px}
+  .notes-timeline .note-index{left:-48px}
+  .notes-timeline::before{left:17px}
+}
+@media (prefers-reduced-motion:reduce){
+  .section-card,.brief-button,.card-go,.catalog-row,.button,.faq-plus,.allocation i{transition:none}
+  .section-card:hover,.button:hover,.catalog-row:hover{transform:none}
+}

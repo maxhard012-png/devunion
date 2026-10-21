@@ -1,0 +1,23 @@
+VILKA — self-hosted typefaces
+=============================
+
+All three families are licensed under the SIL Open Font License 1.1
+(full text: OFL-1.1.txt). The OFL permits use, embedding and
+redistribution in commercial work; it forbids selling the fonts on
+their own and requires this notice to travel with the files.
+
+Unbounded          display / headings
+  by NaN (nan.xyz). Open source and funded by the Polkadot treasury.
+  https://fonts.google.com/specimen/Unbounded
+
+Onest              prose / reading text
+  by Dmitri Voloshin, Andrey Kudryavtsev.
+  https://fonts.google.com/specimen/Onest
+
+Martian Mono       technical text, HUD, ASCII panels
+  by Roman Shamin, Evil Martians.
+  https://fonts.google.com/specimen/Martian+Mono
+
+Files are the latin and cyrillic subsets of each variable font, taken
+from the Google Fonts CDN and served from this repository, so the site
+makes no third-party requests.
