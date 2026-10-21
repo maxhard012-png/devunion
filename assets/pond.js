@@ -29,7 +29,9 @@ const PAL = [
 ];
 const GUIDE_DOT = { hammer: 0, mako: 1, nurse: 2, koi: 3, koi3: 4, koi2: 6, school: 7 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
-const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
+// more colour, same lightness: each channel pushed away from the grey of its own mean
+const vivid = (c, k) => { const m = (c[0] + c[1] + c[2]) / 3; return c.map(v => clamp(Math.round(m + (v - m) * k), 0, 255)); };
+const rgba = (c, a) =>`rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
 const WHITE = [255, 255, 255], BLACK = [0, 0, 0];
 const ACCENT = [[204, 64, 118], [32, 148, 140], [122, 80, 206], [204, 146, 34]];   // pink, teal, violet, gold
 // per colour: the skin, the skin of a called fish (a touch deeper and more saturated), the glyph ink, and the tint of the
@@ -101,12 +103,14 @@ function paint(key) {
     // switching off. The glyph inverts against its square, so it always reads
     const hue = type ? L.hot : L.base, inset = Math.max(1, Math.round(dpr * 0.5));
     // a narrow band of shades around the fish's own colour: varied enough to read as scales, close enough to read as one skin
-    // On night water the band sits a step darker and every glyph is light, so the fish glow out of the dark instead
-    const tile = vr === 5 ? mix(L.accent, hue, 0.45) : night ? mix(mix(hue, BLACK, 0.12), mix(hue, BLACK, 0.48), vr / 4)
-      : mix(mix(hue, WHITE, 0.28), mix(hue, BLACK, 0.34), vr / 4), dark = night || vr === 4;
-    actx.fillStyle = rgba(tile, 0.3 + 0.62 * v);
+    // On night water the colours are pushed richer (the muted daylight skins read as grey on a dark page), the band runs
+    // from that rich hue down a step, and every glyph is light, so the fish glow out of the dark
+    const nh = night ? vivid(hue, 1.7) : hue;
+    const tile = night ? (vr === 5 ? mix(vivid(L.accent, 1.2), nh, 0.25) : mix(nh, mix(nh, BLACK, 0.4), vr / 4))
+      : vr === 5 ? mix(L.accent, hue, 0.45) : mix(mix(hue, WHITE, 0.28), mix(hue, BLACK, 0.34), vr / 4), dark = night || vr === 4;
+    actx.fillStyle = rgba(tile, night ? 0.38 + 0.6 * v : 0.3 + 0.62 * v);
     actx.fillRect(x + inset * 0.5, y + inset * 0.5, sw - inset, sh - inset);
-    actx.fillStyle = dark ? rgba(mix(hue, WHITE, 0.82), 0.5 + 0.5 * v) : rgba(mix(hue, BLACK, 0.72), 0.45 + 0.55 * v);
+    actx.fillStyle = dark ? rgba(mix(nh, WHITE, 0.8), 0.55 + 0.45 * v) : rgba(mix(hue, BLACK, 0.72), 0.45 + 0.55 * v);
     actx.fillText(GLYPHS[g], x + sw / 2, y + sh / 2 + dpr * 0.5);
   } else {
     const ink = night ? (c === 9 ? mix(L.base, WHITE, 0.15) : mix(L.base, WHITE, 0.3)) : c === 9 ? L.base : L.ink;
@@ -693,7 +697,8 @@ function simulate(dt, t) {
   for (let i = ripples.length - 1; i >= 0; i--) { const r = ripples[i]; r.r += r.speed * dt; if (r.r > r.max) ripples.splice(i, 1); }
   const k = Math.pow(0.2, dt);
   for (let i = 0; i < wakeB.length; i++) wakeB[i] *= k;
-  for (const d of dust) { d.p += dt * 0.5; d.x += Math.sin(d.p + d.y * 0.01) * 3 * dt; d.y += Math.cos(d.p * 0.7 + d.x * 0.01) * 2.4 * dt; }
+  // motes ride the same current as the streaks, at half its speed (they sit a little deeper), and wrap at the edges
+  for (const d of dust) { d.p += dt * 0.5; const [u, v] = flow(d.x, d.y); d.x = (d.x + u * 0.5 * dt + W) % W; d.y = (d.y + v * 0.5 * dt + H) % H; }
 }
 // a called fish swims in its own light: soft tinted pools along the spine, laid on the water under the tiles
 function drawGlow() {
@@ -709,32 +714,54 @@ function drawGlow() {
     }
   }
 }
-// ── small ASCII waves on the water ──────────────────────────────────
-// A sparse scatter of short "~-~" strokes, not a fill: each one swells in, drifts a little with the surface and fades out
-// over 5–10 s, then reappears somewhere else. About one per 38 000 px², capped, so big screens do not get busier.
-const WAVE_SHAPES = ['~-~', '-~~-', '~~', '-~-', '~-~-~', '~~-'];
-const waves = [];
-function seedWave(w, fresh) {
-  w.x = Math.random() * W; w.y = Math.random() * H;
-  w.shape = WAVE_SHAPES[(Math.random() * WAVE_SHAPES.length) | 0];
-  w.life = 5 + Math.random() * 5; w.age = fresh ? Math.random() * w.life : 0;
-  w.vx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 4); w.vy = (Math.random() - 0.5) * 1.5;
-  w.peak = 0.35 + Math.random() * 0.4;
-  return w;
+// ── the current: a slow, coherent flow that the water's marks ride ──────
+// The pond has one current: a steady drift to the right and a little down, with broad slow eddies turning in it. It is
+// the curl of a stream function, so it never piles up or empties anywhere: marks follow it like dye in water, not
+// at random. Speeds stay around 5–20 px/s, well below the fish, so the water reads as calm.
+let flowT = 0;
+// ψ = A·sin(x/260 + 0.03t)·sin(y/300) + B·sin((0.6x + y)/420 − 0.05t); velocity = (∂ψ/∂y, −∂ψ/∂x) plus the drift (7, 2)
+const EDDY = 9 * 300, BAND = 6 * 420;
+function flow(x, y) {
+  const s1 = x / 260 + flowT * 0.03, c1 = y / 300, cq = Math.cos((0.6 * x + y) / 420 - flowT * 0.05);
+  return [7 + EDDY / 300 * Math.sin(s1) * Math.cos(c1) + BAND / 420 * cq,
+    2 - EDDY / 260 * Math.cos(s1) * Math.sin(c1) - 0.6 * BAND / 420 * cq];
+}
+// Marks on the water: short, translucent streaks drawn along their own path, so each one shows which way the water is
+// going: its characters turn with the current (− \ | /), a "~" at the leading end, a dot where it trails off. Each fades in,
+// rides the current for 6–12 s and fades out, then starts again elsewhere. About one per 30 000 px², capped.
+const streaks = [];
+function seedStreak(s, fresh) {
+  s.x = Math.random() * W; s.y = Math.random() * H; s.trail = [[s.x, s.y]];
+  s.len = 4 + ((Math.random() * 5) | 0); s.life = 6 + Math.random() * 6; s.age = fresh ? Math.random() * s.life : 0;
+  s.peak = 0.45 + Math.random() * 0.3;
+  return s;
 }
 function buildWaves() {
-  const n = Math.min(70, Math.round(W * H / 38000));
-  waves.length = 0;
-  for (let i = 0; i < n; i++) waves.push(seedWave({}, true));
+  const n = Math.min(60, Math.round(W * H / 30000));
+  streaks.length = 0;
+  for (let i = 0; i < n; i++) streaks.push(seedStreak({}, true));
 }
 function drawWaves(dt) {
-  for (const w of waves) {
-    w.age += dt; w.x += w.vx * dt; w.y += w.vy * dt;
-    if (w.age >= w.life) seedWave(w, false);
-    const a = Math.sin(Math.PI * Math.min(1, w.age / w.life)) * w.peak;      // swells in, fades out
-    if (a < 0.04) continue;
-    const lv = Math.min(LEVELS - 1, (a * LEVELS) | 0);
-    for (let k = 0; k < w.shape.length; k++) blit(2, 9, lv, w.shape[k] === '~' ? G_WAVE : 2, w.x + k * CW, w.y);
+  flowT += dt;
+  for (const s of streaks) {
+    s.age += dt;
+    // midpoint step: follows the curve of an eddy instead of cutting across it
+    const [u0, v0] = flow(s.x, s.y), [u1, v1] = flow(s.x + u0 * dt / 2, s.y + v0 * dt / 2);
+    s.x += u1 * dt; s.y += v1 * dt;
+    const last = s.trail[0];
+    if (Math.hypot(s.x - last[0], s.y - last[1]) >= CW) { s.trail.unshift([s.x, s.y]); if (s.trail.length > s.len) s.trail.pop(); }
+    if (s.age >= s.life || s.x < -40 || s.x > W + 40 || s.y < -40 || s.y > H + 40) seedStreak(s, false);
+    const a = Math.sin(Math.PI * Math.min(1, s.age / s.life)) * s.peak;    // swells in, fades out
+    if (a < 0.03) continue;
+    const T = s.trail, n = T.length;
+    for (let k = 0; k < n; k++) {
+      // the leading end is the brightest; the stroke thins toward its tail
+      const fade = a * (1 - 0.6 * k / Math.max(1, n - 1)), lv = Math.min(LEVELS - 1, (fade * LEVELS) | 0);
+      if (lv < 1) continue;
+      const p = T[k], q = T[Math.min(n - 1, k + 1)], r = T[Math.max(0, k - 1)];
+      const glyph = k === 0 ? G_WAVE : k === n - 1 ? 14 : G_RAY + rayCode(r[0] - q[0], r[1] - q[1]) - 2;
+      blit(2, 9, lv, glyph, p[0] - CW / 2, p[1] - CH / 2);
+    }
   }
 }
 
