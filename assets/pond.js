@@ -56,7 +56,7 @@ const SPR_COLS = 128;
 let W = 0, H = 0, dpr = 1, CW = 6, CH = 7, cols = 0, rows = 0, scale = 1;
 let val, col, own, dep, gly, wakeB;
 // what is on screen, per cell: it chases this frame's stamp and fades out after the fish has left (phosphor persistence)
-let showV, showC, showG, showO, showK, keyB;
+let showV, showC, showG, showO, showK, keyB, bandB;
 let shimT = 0;                                     // scale-shimmer clock: stops with the pause, slows with reduced motion
 let atlas, actx, sw = 0, sh = 0, painted;
 function resize() {
@@ -72,7 +72,7 @@ function resize() {
   dep = new Float32Array(n); gly = new Uint8Array(n);
   wakeB = new Float32Array(n);
   showV = new Float32Array(n); showC = new Uint8Array(n); showG = new Uint8Array(n); showO = new Int16Array(n);
-  showK = new Uint32Array(n); keyB = new Uint32Array(n);
+  showK = new Uint32Array(n); keyB = new Uint32Array(n); bandB = new Uint8Array(n);
   buildAtlas(); buildWaves();
   fish.forEach(f => f.rescale && f.rescale());
 }
@@ -233,8 +233,8 @@ class Fish {
     this.rescale(); this.v = this.spd; this.resetTrail();
   }
   // speed follows body size, so a fish crosses the same share of its own length per second on any screen (on a big screen
-  // the bodies grow; with fixed px/s they looked sluggish), and 1.3× the first pass, which read as too slow
-  rescale() { this.L = this.p.len * scale; this.spd = this.p.speed * (scale / 1.9) * 1.3; }
+  // the bodies grow; with fixed px/s they looked sluggish), and 1.05× the first pass: 1.3× read as darting (client, 2026-10-21)
+  rescale() { this.L = this.p.len * scale; this.spd = this.p.speed * (scale / 1.9) * 1.05; }
   resetTrail() {
     this.trail = [];
     for (let i = 0; i < 300; i++) this.trail.push([this.x - Math.cos(this.a) * i * 2, this.y - Math.sin(this.a) * i * 2]);
@@ -343,7 +343,7 @@ class Fish {
     this.omega += (target - this.omega) * Math.min(1, dt * resp);
     // a body cannot turn tighter than a radius tied to its own length: past that the spine folds into a hairpin.
     // On a big screen the bodies are large and the fixed turn rates did exactly that (kinks up to 170°).
-    const wmax = Math.max(0.15, this.v / (L * (p.gait === 'cruise' ? 0.55 : 0.4)));
+    const wmax = Math.max(0.15, this.v / (L * (p.gait === 'cruise' ? 0.55 : 0.6)));
     this.omega = clamp(this.omega, -wmax, wmax);
     this.a += this.omega * dt;
     this.gait(dt, want);
@@ -480,9 +480,12 @@ class Fish {
             if (this.kind === 'hammer' && u > 0.34 && u < 0.8 && Math.sin(u * 46) > 0.8 && an < 0.7) v *= 0.72;  // faint saddle bars
           }
           // the outermost cells are glyph-only: a soft silhouette instead of a hard block edge
-          // which scale this cell shows: fixed to the spot on the body, so the pattern swims with the fish
-          const key = (hash(Math.round(u * 80) + this.id * 997, Math.round(nd * 4) + 7) * 4294967295) >>> 0;
-          stamp(x + Nx * d, y + Ny * d, clamp(v * bright * (an > 0.86 ? 0.8 : 1), 0, 1), c, an > 0.86 ? SHEER : 0, key);
+          // which scale this cell shows: fixed to the screen cell, not to the spot on the body. A body-fixed pattern slides
+          // under the fixed grid as the fish swims, and a third of the cells changed character every frame: the jitter the
+          // client saw. Fixed to the cell, a character holds while the fish covers it and only the outline moves
+          const sx = x + Nx * d, sy = y + Ny * d;
+          const key = (hash(Math.floor(sx / CW) * 7919 + Math.floor(sy / CH), this.id * 997 + 7) * 4294967295) >>> 0;
+          stamp(sx, sy, clamp(v * bright * (an > 0.86 ? 0.8 : 1), 0, 1), c, an > 0.86 ? SHEER : 0, key);
         }
       }
     }
@@ -747,11 +750,11 @@ function render(dt) {
   ctx.font = `600 ${Math.round(CH * 1.02)}px 'JetBrains Mono', ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   drawWaves(dt);
   drawGlow();
-  const rise = dt > 0 ? 1 - Math.exp(-dt * 30) : 1, fall = dt > 0 ? Math.exp(-dt * 16) : 0;
+  const rise = dt > 0 ? 1 - Math.exp(-dt * 20) : 1, fall = dt > 0 ? Math.exp(-dt * 11) : 0;
   for (const d of dust) blit(2, 9, 1 + ((d.l * 3) | 0), 14, d.x, d.y);
   for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
     const i = cy * cols + cx, X = cx * CW, Y = cy * CH;
-    // A cell eases toward what the fish stamps into it and, once the fish has moved on, fades over ~150 ms.
+    // A cell eases toward what the fish stamps into it and, once the fish has moved on, fades over ~250 ms.
     // Without this a cell is either on or off, and the body visibly hops from cell to cell.
     if (own[i] >= 0) { showV[i] += (val[i] - showV[i]) * rise; showC[i] = col[i]; showG[i] = gly[i]; showO[i] = own[i]; showK[i] = keyB[i]; }
     else showV[i] *= fall;
@@ -764,10 +767,14 @@ function render(dt) {
         // about every 6 s, so the skin drifts rather than flickers. Shades lean darker towards the spine and stay mostly in the
         // middle of the band; one square in forty is a muted accent, and a few pale ones
         // at the edge carry no character at all
-        const k = showK[i], tick = Math.floor(shimT * 0.17 + (k % 997) / 97), set = BANDS[Math.min(5, (v * 6) | 0)];
+        // the tone band (0–3) follows the cell's brightness with hysteresis: it moves only once the brightness is well past
+        // the band's edge, so a fish sliding over a cell does not tip its character back and forth at every threshold
+        const bt = v * 4; let bd = bandB[i]; if (Math.abs(bt - bd - 0.5) > 0.85) bandB[i] = bd = Math.min(3, bt | 0);
+        const k = showK[i], tick = Math.floor(shimT * 0.17 + (k % 997) / 97), set = BANDS[[1, 2, 3, 5][bd]];
         const h1 = hash(k % 100003, tick), h2 = hash((k >>> 7) % 100003, tick + 31);
-        const tone = h2 > 0.975 ? 5 : Math.max(0, Math.min(4, Math.round(0.9 + v * 1.6 + (h2 - 0.5) * 1.6)));
-        blit(hot, c, lv, v < 0.45 && h1 > 0.8 ? G_BARE : set[(h1 * set.length) | 0], X, Y, tone);
+        const tone = h2 > 0.975 ? 5 : Math.max(0, Math.min(4, Math.round(0.9 + bd * 0.55 + (h2 - 0.5) * 1.6)));
+        const GL = bd === 0 && h1 > 0.8 ? G_BARE : set[(h1 * set.length) | 0];
+        blit(hot, c, lv, GL, X, Y, tone);
       } else {
         const glyph = gg === 1 ? G_EYE : gg >= 2 ? G_RAY + gg - 2 : Math.min(RAMP_N - 1, (v * RAMP_N) | 0);
         blit(sheer ? 2 : hot, c, lv, glyph, X, Y, gg === 1 ? 4 : 1);   // the eye: a light mark on a dark square
