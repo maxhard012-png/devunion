@@ -1,4 +1,4 @@
-// DevUnion — ASCII pond. Own engine: fish are rasterised into a fine glyph grid, every cell a tinted tile with a glyph,
+// DevUnion — ASCII pond. Own engine: fish are rasterised into a fine glyph grid, every cell a coloured glyph,
 // blitted from a pre-drawn atlas (drawImage is far cheaper than fillText, which is what lets the grid be this fine).
 // Any element with data-guide owns one fish: hover calls it over, click sends it into the element and then navigates.
 // The page decides who lives in it: <canvas id="pond" data-fish="hammer,minnows">; no list means everyone.
@@ -27,36 +27,44 @@ const PAL = [
   [140, 150, 146],  // 8 small grey fish
   [120, 128, 130],  // 9 water: dust, wakes, ripples
 ];
-const GUIDE_DOT = { hammer: 0, mako: 1, koi: 3, koi2: 6, school: 7 };
+const GUIDE_DOT = { hammer: 0, mako: 1, nurse: 2, koi: 3, koi3: 4, koi2: 6, school: 7 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
 const WHITE = [255, 255, 255], BLACK = [0, 0, 0];
+const ACCENT = [[204, 64, 118], [32, 148, 140], [122, 80, 206], [204, 146, 34]];   // pink, teal, violet, gold
 // per colour: the skin, the skin of a called fish (a touch deeper and more saturated), the glyph ink, and the tint of the
 // light pool under a called fish
 const LOOK = PAL.map(c => {
   const m = (c[0] + c[1] + c[2]) / 3;
   const hot = c.map(v => clamp(Math.round(m + (v - m) * 1.3 - 8), 0, 255));
-  return { base: c, hot, ink: mix(c, BLACK, 0.58), glow: mix(c, WHITE, 0.35) };
+  return { base: c, hot, ink: mix(c, BLACK, 0.58), glow: mix(c, WHITE, 0.35),
+    // scale tiles, as in the reference: every cell is a small square in its own shade of the fish, from pale to near black,
+    // plus a rare muted accent. tone(t, hue) gives the square; the glyph on it inverts (dark on pale, light on dark)
+    accent: mix(ACCENT[PAL.indexOf(c) % ACCENT.length], [128, 128, 128], 0.3) };
 });
 
-// glyphs: 0–8 tone ramp, 9 eye, 10–13 fin rays by direction, 14 dot
-const GLYPHS = '.:-=+*%#@o-\\|/.';
-const NG = GLYPHS.length, RAMP_N = 9, G_EYE = 9, G_RAY = 10;
+// glyphs: 0–8 tone ramp, 9 eye, 10–13 fin rays by direction, 14 dot, 15 wave, 16+ extra scale characters
+const GLYPHS = '.:-=+*%#@o-\\|/.~,;\'tSxX8& ';     // the last, a space, is a bare tile
+// scale characters by tone, light skin to deep shadow, as in the reference: a cell picks one by its place on the body
+const BANDS = ['.,:\'', ':;-=', '=+tx', '%Sx*', 'X8#%', '8#@&'].map(set => [...set].map(ch => GLYPHS.indexOf(ch)));
+const NG = GLYPHS.length, RAMP_N = 9, G_EYE = 9, G_RAY = 10, G_WAVE = 15, G_BARE = NG - 1;
 const LEVELS = 8, NC = PAL.length, NT = 3;         // sprite types: 0 body, 1 lit body, 2 glyph only (fins, water dots)
+const NV = 6;                                      // tile tones per body sprite: 0 pale … 4 near black, 5 accent
 const SPR_COLS = 128;
 
 // ── grid + atlas ─────────────────────────────────────────────────────
 let W = 0, H = 0, dpr = 1, CW = 6, CH = 7, cols = 0, rows = 0, scale = 1;
 let val, col, own, dep, gly, wakeB;
 // what is on screen, per cell: it chases this frame's stamp and fades out after the fish has left (phosphor persistence)
-let showV, showC, showG, showO;
+let showV, showC, showG, showO, showK, keyB;
+let shimT = 0;                                     // scale-shimmer clock: stops with the pause, slows with reduced motion
 let atlas, actx, sw = 0, sh = 0, painted;
 function resize() {
   W = innerWidth; H = innerHeight; dpr = Math.min(devicePixelRatio || 1, 2);
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const small = W < 640;
-  CW = small ? 5 : 6; CH = small ? 6 : 7;
+  CW = small ? 6 : 8; CH = small ? 7 : 9;   // tiles big enough to read as squares, as in the reference
   scale = Math.max(0.38, Math.min(1.15, W / 1440)) * 1.9;      // fish 1.3× larger than the first pass (client: «рыбок чуть побольше»)
   cols = Math.ceil(W / CW) + 1; rows = Math.ceil(H / CH) + 1;
   const n = cols * rows;
@@ -64,12 +72,17 @@ function resize() {
   dep = new Float32Array(n); gly = new Uint8Array(n);
   wakeB = new Float32Array(n);
   showV = new Float32Array(n); showC = new Uint8Array(n); showG = new Uint8Array(n); showO = new Int16Array(n);
-  buildAtlas();
+  showK = new Uint32Array(n); keyB = new Uint32Array(n);
+  buildAtlas(); buildWaves();
   fish.forEach(f => f.rescale && f.rescale());
 }
+// Sprite layout: body sprites, plain and lit, come in NV tile tones (the shimmer); glyph-only sprites in one.
+// Keys: [0, N0) plain body, [N0, 2·N0) lit body, then glyph-only.
+let N0 = 0, N1 = 0;
 function buildAtlas() {
   sw = Math.ceil(CW * dpr); sh = Math.ceil(CH * dpr);
-  const total = NT * NC * LEVELS * NG;
+  N0 = NC * LEVELS * NG * NV; N1 = N0;
+  const total = 2 * N0 + NC * LEVELS * NG;
   atlas = document.createElement('canvas');
   atlas.width = SPR_COLS * sw; atlas.height = Math.ceil(total / SPR_COLS) * sh;
   actx = atlas.getContext('2d');
@@ -78,14 +91,20 @@ function buildAtlas() {
   painted = new Uint8Array(total);       // sprites are painted lazily, the first time a cell asks for them
 }
 function paint(key) {
-  const g = key % NG, lv = ((key / NG) | 0) % LEVELS, c = ((key / (NG * LEVELS)) | 0) % NC, type = (key / (NG * LEVELS * NC)) | 0;
+  let type, c, lv, g, vr = 0, k = key;
+  if (k < N0 + N1) { type = k < N0 ? 0 : 1; if (type) k -= N0; vr = k % NV; k = (k / NV) | 0; } else { type = 2; k -= N0 + N1; }
+  g = k % NG; lv = ((k / NG) | 0) % LEVELS; c = ((k / (NG * LEVELS)) | 0) % NC;
   const x = (key % SPR_COLS) * sw, y = ((key / SPR_COLS) | 0) * sh, v = lv / (LEVELS - 1), L = LOOK[c];
-  const inset = Math.max(1, Math.round(dpr * 0.5));
   if (type === 0 || type === 1) {
-    // translucent tiles and a deep glyph: value fades the cell in and out, so a cell a fish is leaving dims instead of switching off
-    actx.fillStyle = type ? rgba(L.hot, 0.3 + 0.58 * v) : rgba(L.base, 0.2 + 0.56 * v);
+    // a square in one of five shades of the fish (a called fish, type 1, in its saturated hue) or the accent, with a
+    // hairline gap to its neighbours; value fades the cell in and out, so a cell a fish is leaving dims instead of
+    // switching off. The glyph inverts against its square, so it always reads
+    const hue = type ? L.hot : L.base, inset = Math.max(1, Math.round(dpr * 0.5));
+    // a narrow band of shades around the fish's own colour: varied enough to read as scales, close enough to read as one skin
+    const tile = vr === 5 ? mix(L.accent, hue, 0.45) : mix(mix(hue, WHITE, 0.28), mix(hue, BLACK, 0.34), vr / 4), dark = vr === 4;
+    actx.fillStyle = rgba(tile, 0.3 + 0.62 * v);
     actx.fillRect(x + inset * 0.5, y + inset * 0.5, sw - inset, sh - inset);
-    actx.fillStyle = rgba(L.ink, type ? 0.6 + 0.4 * v : 0.4 + 0.55 * v);
+    actx.fillStyle = dark ? rgba(mix(hue, WHITE, 0.86), 0.5 + 0.5 * v) : rgba(mix(hue, BLACK, 0.72), 0.45 + 0.55 * v);
     actx.fillText(GLYPHS[g], x + sw / 2, y + sh / 2 + dpr * 0.5);
   } else {
     actx.fillStyle = c === 9 ? rgba(L.base, 0.14 + 0.56 * v) : rgba(L.ink, 0.3 + 0.7 * v);
@@ -93,8 +112,8 @@ function paint(key) {
   }
   painted[key] = 1;
 }
-function blit(type, c, lv, g, X, Y) {
-  const key = ((type * NC + c) * LEVELS + lv) * NG + g;
+function blit(type, c, lv, g, X, Y, vr = 0) {
+  const k = (c * LEVELS + lv) * NG + g, key = type === 2 ? N0 + N1 + k : type * N0 + k * NV + vr;
   if (!painted[key]) paint(key);
   ctx.drawImage(atlas, (key % SPR_COLS) * sw, ((key / SPR_COLS) | 0) * sh, sw, sh, X, Y, CW, CH);
 }
@@ -106,16 +125,16 @@ for (const b of $$('[data-guide]')) {
 // ── stamping into the grid ───────────────────────────────────────────
 let curId = 0, curDepth = 0;
 // glyph code per cell: 0 = pick from the tone ramp, 1 = eye, 2–5 = fin ray (− \ | /); +8 = sheer: glyph only, no tile
-function stamp(x, y, v, c, g) {
+function stamp(x, y, v, c, g, key = 0) {
   const cx = (x / CW) | 0, cy = (y / CH) | 0;
   if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) return;
   const i = cy * cols + cx;
   if (own[i] === curId) {
-    if (g === 1 || (v > val[i] && gly[i] !== 1) || (gly[i] >= SHEER && g < SHEER)) { val[i] = Math.max(v, val[i]); col[i] = c; gly[i] = g; }
+    if (g === 1 || (v > val[i] && gly[i] !== 1) || (gly[i] >= SHEER && g < SHEER)) { val[i] = Math.max(v, val[i]); col[i] = c; gly[i] = g; keyB[i] = key; }
     return;
   }
   if (own[i] >= 0 && dep[i] > curDepth) return;
-  own[i] = curId; dep[i] = curDepth; val[i] = v; col[i] = c; gly[i] = g;
+  own[i] = curId; dep[i] = curDepth; val[i] = v; col[i] = c; gly[i] = g; keyB[i] = key;
 }
 function stampWake(x, y, v) {
   const cx = (x / CW) | 0, cy = (y / CH) | 0;
@@ -189,19 +208,22 @@ const foam = [];
 let guides = {}, clock = 0;
 
 const SEG = 36;
+const MAX_JOINT = 14 * Math.PI / 180;      // the most one spine joint may bend from its neighbour
 class Fish {
   constructor(kind, id) {
     this.kind = kind; this.p = PLANS[kind]; this.id = id; this.seed = Math.random() * 1000;
     this.x = W * (0.1 + Math.random() * 0.8); this.y = H * (0.1 + Math.random() * 0.8); this.a = Math.random() * TAU;
-    this.v = this.p.speed; this.omega = 0; this.phase = Math.random() * TAU; this.amp = 1;
+    this.v = 0; this.omega = 0; this.phase = Math.random() * TAU; this.amp = 1;
     this.kickT = Math.random(); this.heading = this.a; this.nextTurn = 0; this.stroke = 1; this.power = 1; this.foamAcc = 0; this.fin = 0.5; this.glow = 0; this.mode = 'free'; this.z = 0.5; this.startle = 0;
     this.nibbleT = 0;
     // the long script: pace changes, koi lingering, and leaving the frame to come back elsewhere
     this.pace = 1; this.paceGoal = 1; this.paceT = 0; this.linger = 0; this.away = false; this.awayT = 0; this.enteredAt = 0; this.bold = Math.random() < 0.7;
     this.sx = new Float32Array(SEG); this.sy = new Float32Array(SEG); this.nx = new Float32Array(SEG); this.ny = new Float32Array(SEG);
-    this.rescale(); this.resetTrail();
+    this.rescale(); this.v = this.spd; this.resetTrail();
   }
-  rescale() { this.L = this.p.len * scale; }
+  // speed follows body size, so a fish crosses the same share of its own length per second on any screen (on a big screen
+  // the bodies grow; with fixed px/s they looked sluggish), and 1.3× the first pass, which read as too slow
+  rescale() { this.L = this.p.len * scale; this.spd = this.p.speed * (scale / 1.9) * 1.3; }
   resetTrail() {
     this.trail = [];
     for (let i = 0; i < 300; i++) this.trail.push([this.x - Math.cos(this.a) * i * 2, this.y - Math.sin(this.a) * i * 2]);
@@ -226,14 +248,14 @@ class Fish {
     }
     this.a = this.heading = Math.atan2(ty - ey, tx - ex);
     this.x = ex - Math.cos(this.a) * this.L * 0.1; this.y = ey - Math.sin(this.a) * this.L * 0.1;
-    this.omega = 0; this.v = this.p.speed; this.nextTurn = t + 4000; this.enteredAt = t;
+    this.omega = 0; this.v = this.spd; this.nextTurn = t + 4000; this.enteredAt = t;
     this.away = false; this.bold = Math.random() < 0.7;
     this.resetTrail();
   }
   // Steering works on angular velocity, never on heading directly: every turn eases in and out, so paths are curves, not corners.
   steer(dt, t) {
     const p = this.p, L = this.L;
-    let want = p.speed, turnMax = p.turn, resp = 1.6;
+    let want = this.spd, turnMax = p.turn, resp = 1.6;
     const sharkish = p.gait === 'cruise';
     // 0. Every 8–20 s the fish changes pace (unhurried, normal, brisk); now and then a koi lingers in one spot for a while,
     //    pottering about slowly. Over a minute no two fish follow the same rhythm.
@@ -275,7 +297,7 @@ class Fish {
       const dx = pointer.x - this.x, dy = pointer.y - this.y, d = Math.hypot(dx, dy);
       if (d < 520) {
         goal = Math.atan2(dy, dx); weight = 0.9;
-        want = d > L * 0.75 ? p.speed * 0.9 : p.speed * 0.06;
+        want = d > L * 0.75 ? this.spd * 0.9 : this.spd * 0.06;
         if (d < L * 0.9 && (this.nibbleT -= dt) < 0) {
           this.nibbleT = 0.7 + Math.random() * 0.9;
           ripples.push({ x: this.sx[0] + Math.cos(this.a) * 4, y: this.sy[0] + Math.sin(this.a) * 4, r: 0, max: 26, speed: 40 });
@@ -285,13 +307,13 @@ class Fish {
     // 5. a startle (click in the water) overrides everything for a moment: bolt away
     if (this.startle > 0) {
       this.startle -= dt;
-      goal = this.flee; weight = 1; want = p.speed * 2.2; turnMax *= 2.2; resp = 3.5;
+      goal = this.flee; weight = 1; want = this.spd * 2.2; turnMax *= 2.2; resp = 3.5;
     }
     // 6. called by a button or a catalogue row
     if (this.mode !== 'free' && this.btn) {
       const r = this.btn.getBoundingClientRect(), bx = r.left + r.width / 2, by = r.top + r.height / 2;
       resp = 4.5; turnMax *= 2.4;
-      if (this.mode === 'call') { goal = Math.atan2(by - this.y, bx - this.x); weight = 1; want = p.speed * 3.6; }
+      if (this.mode === 'call') { goal = Math.atan2(by - this.y, bx - this.x); weight = 1; want = this.spd * 3.6; }
       else {
         // the orbit hugs the element's own shape, so a wide row gets a lap along it, not a circle past its ends
         const rx = r.width / 2 + L * 0.18, ry = r.height / 2 + L * 0.25;
@@ -299,7 +321,7 @@ class Fish {
         const ang = Math.atan2(ey, ex) + 0.9;
         const tx = far ? bx : bx + Math.cos(ang) * rx, ty = far ? by : by + Math.sin(ang) * ry;
         goal = Math.atan2(ty - this.y, tx - this.x); weight = 1;
-        want = p.speed * (far ? 6 : 1.5);
+        want = this.spd * (far ? 6 : 1.5);
       }
       target *= 0.15;
       // facing away, a called fish brakes into the turn instead of swinging round a huge arc at full speed
@@ -308,12 +330,16 @@ class Fish {
     if (goal !== null) target = target * (1 - weight) + clamp(angDiff(goal, this.a) * 2.4, -turnMax, turnMax) * weight;
     target = clamp(target, -turnMax, turnMax);
     this.omega += (target - this.omega) * Math.min(1, dt * resp);
+    // a body cannot turn tighter than a radius tied to its own length: past that the spine folds into a hairpin.
+    // On a big screen the bodies are large and the fixed turn rates did exactly that (kinks up to 170°).
+    const wmax = Math.max(0.15, this.v / (L * (p.gait === 'cruise' ? 0.55 : 0.4)));
+    this.omega = clamp(this.omega, -wmax, wmax);
     this.a += this.omega * dt;
     this.gait(dt, want);
   }
   // speed and tail beat come from the gait, so the body visibly works for its speed
   gait(dt, want) {
-    const p = this.p, rel = want / p.speed;
+    const p = this.p, rel = want / this.spd;
     if (p.gait === 'burst') {
       // koi: a stroke, then a glide that bleeds speed. The stroke is a thrust envelope over ~0.8 s, never an impulse:
       // speed and tail sweep swell and settle, so seen from above the fish surges instead of jumping.
@@ -323,8 +349,8 @@ class Fish {
       }
       let thrust = 0;
       if (this.stroke < 0.8) { this.stroke += dt; thrust = Math.sin(Math.PI * Math.min(1, this.stroke / 0.8)) * this.power; }
-      this.v += p.speed * 1.0 * thrust * dt;   // shorter, gentler strokes: speed swells ±30%, it never stalls
-      this.v = Math.min(this.v * Math.exp(-dt * 0.35), p.speed * 2.4 * Math.max(1, rel));
+      this.v += this.spd * 1.0 * thrust * dt;   // shorter, gentler strokes: speed swells ±30%, it never stalls
+      this.v = Math.min(this.v * Math.exp(-dt * 0.35), this.spd * 2.4 * Math.max(1, rel));
       // a called koi still strokes, but its speed is pulled straight toward the goal: strokes alone took up to 5 s to arrive
       if (this.mode !== 'free') this.v += (want * 0.7 - this.v) * Math.min(1, dt * 2.5);
       this.amp += (0.32 + 0.9 * thrust - this.amp) * Math.min(1, dt * 3);
@@ -332,11 +358,11 @@ class Fish {
     } else {
       // sharks: no bursts, a steady sweep; acceleration is slow and so is the beat
       this.v += (want - this.v) * Math.min(1, dt * (want > this.v ? (this.mode === 'free' ? 1.6 : 4) : 0.9));
-      this.amp += (0.55 + 0.45 * Math.min(1.3, this.v / p.speed) - this.amp) * Math.min(1, dt * 2);
+      this.amp += (0.55 + 0.45 * Math.min(1.3, this.v / this.spd) - this.amp) * Math.min(1, dt * 2);
       this.phase += dt * (1.1 + (this.v / this.L) * 7);
     }
     // pectorals spread when slow or turning, tuck in when fast
-    const finT = clamp(1.1 - this.v / (p.speed * 1.8) + Math.abs(this.omega) * 0.35, 0.15, 1);
+    const finT = clamp(1.1 - this.v / (this.spd * 1.8) + Math.abs(this.omega) * 0.35, 0.15, 1);
     this.fin += (finT - this.fin) * Math.min(1, dt * 3);
   }
   move(dt, t) {
@@ -345,7 +371,7 @@ class Fish {
     this.z = vnoise(t * 0.00005 + this.seed * 0.37, this.seed + 9);
     // near the surface the head pushes a bow wave: foam is shed at both cheeks and drifts outward, leaving a V
     const surface = clamp((this.z - 0.3) / 0.4, 0, 1);
-    this.foamAcc += dt * 16 * surface * Math.min(1.6, this.v / this.p.speed);
+    this.foamAcc += dt * 16 * surface * Math.min(1.6, this.v / this.spd);
     while (this.foamAcc > 1 && foam.length < 1400) {
       this.foamAcc -= 1;
       const a = this.at(0.06), push = 6 + this.v * 0.12;
@@ -375,6 +401,21 @@ class Fish {
       }
       if (j >= trail.length - 1) { sx[i] = trail[trail.length - 1][0]; sy[i] = trail[trail.length - 1][1]; }
     }
+    // Chain constraint: from the head back, a joint that bends more than MAX_JOINT is turned back to the limit, keeping its
+    // link's own length; joints within the limit are left exactly where the path put them. Whatever the path does
+    // (a re-entry, a dropped frame, a hairpin) the body then bends but can never fold, and ordinary swimming is untouched.
+    const link = L / (SEG - 1);
+    let dir = Math.atan2(sy[1] - sy[0], sx[1] - sx[0]);
+    if (sx[1] === sx[0] && sy[1] === sy[0]) { dir = this.a + Math.PI; sx[1] = sx[0] + Math.cos(dir) * link; sy[1] = sy[0] + Math.sin(dir) * link; }
+    for (let i = 2; i < SEG; i++) {
+      const dx = sx[i] - sx[i - 1], dy = sy[i] - sy[i - 1], len = Math.hypot(dx, dy);
+      const want = len > 1e-6 ? Math.atan2(dy, dx) : dir, d = angDiff(want, dir);
+      if (Math.abs(d) > MAX_JOINT || len <= 1e-6) {
+        dir += clamp(d, -MAX_JOINT, MAX_JOINT);
+        const l = Math.max(len, link * 0.5);
+        sx[i] = sx[i - 1] + Math.cos(dir) * l; sy[i] = sy[i - 1] + Math.sin(dir) * l;
+      } else dir = want;
+    }
     for (let i = 0; i < SEG; i++) {
       const a = Math.max(0, i - 1), b = Math.min(SEG - 1, i + 1);
       let tx = sx[a] - sx[b], ty = sy[a] - sy[b]; const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
@@ -395,11 +436,16 @@ class Fish {
   }
   draw() {
     this.spine();
+    if (!(isFinite(this.x) && isFinite(this.y) && isFinite(this.sx[SEG - 1]))) { this.x = W / 2; this.y = -this.L; this.resetTrail(); return; }
     const { sx, sy, nx, ny, L, p } = this, step = Math.min(CW, CH) * 0.42;
     curId = this.id; curDepth = p.depth + this.z * 0.6;
     const g = this.glow, lx = -0.35, ly = -0.45, bright = 0.72 + 0.28 * this.z, shark = p.gait === 'cruise';
     for (let i = 0; i < SEG - 1; i++) {
-      const segL = Math.hypot(sx[i + 1] - sx[i], sy[i + 1] - sy[i]), n = Math.max(1, Math.ceil(segL / step));
+      // a link is at most a few cells long; anything longer (or not a number) means a broken point, and drawing it would
+      // run a loop for millions of steps and freeze the page, so it is skipped
+      const segL = Math.hypot(sx[i + 1] - sx[i], sy[i + 1] - sy[i]);
+      if (!(segL < L)) continue;
+      const n = Math.max(1, Math.ceil(segL / step));
       for (let k = 0; k < n; k++) {
         const t = k / n, u = (i + t) / (SEG - 1);
         const x = sx[i] + (sx[i + 1] - sx[i]) * t, y = sy[i] + (sy[i + 1] - sy[i]) * t;
@@ -423,7 +469,9 @@ class Fish {
             if (this.kind === 'hammer' && u > 0.34 && u < 0.8 && Math.sin(u * 46) > 0.8 && an < 0.7) v *= 0.72;  // faint saddle bars
           }
           // the outermost cells are glyph-only: a soft silhouette instead of a hard block edge
-          stamp(x + Nx * d, y + Ny * d, clamp(v * bright * (an > 0.86 ? 0.8 : 1), 0, 1), c, an > 0.86 ? SHEER : 0);
+          // which scale this cell shows: fixed to the spot on the body, so the pattern swims with the fish
+          const key = (hash(Math.round(u * 80) + this.id * 997, Math.round(nd * 4) + 7) * 4294967295) >>> 0;
+          stamp(x + Nx * d, y + Ny * d, clamp(v * bright * (an > 0.86 ? 0.8 : 1), 0, 1), c, an > 0.86 ? SHEER : 0, key);
         }
       }
     }
@@ -644,6 +692,35 @@ function drawGlow() {
     }
   }
 }
+// ── small ASCII waves on the water ──────────────────────────────────
+// A sparse scatter of short "~-~" strokes, not a fill: each one swells in, drifts a little with the surface and fades out
+// over 5–10 s, then reappears somewhere else. About one per 38 000 px², capped, so big screens do not get busier.
+const WAVE_SHAPES = ['~-~', '-~~-', '~~', '-~-', '~-~-~', '~~-'];
+const waves = [];
+function seedWave(w, fresh) {
+  w.x = Math.random() * W; w.y = Math.random() * H;
+  w.shape = WAVE_SHAPES[(Math.random() * WAVE_SHAPES.length) | 0];
+  w.life = 5 + Math.random() * 5; w.age = fresh ? Math.random() * w.life : 0;
+  w.vx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 4); w.vy = (Math.random() - 0.5) * 1.5;
+  w.peak = 0.35 + Math.random() * 0.4;
+  return w;
+}
+function buildWaves() {
+  const n = Math.min(70, Math.round(W * H / 38000));
+  waves.length = 0;
+  for (let i = 0; i < n; i++) waves.push(seedWave({}, true));
+}
+function drawWaves(dt) {
+  for (const w of waves) {
+    w.age += dt; w.x += w.vx * dt; w.y += w.vy * dt;
+    if (w.age >= w.life) seedWave(w, false);
+    const a = Math.sin(Math.PI * Math.min(1, w.age / w.life)) * w.peak;      // swells in, fades out
+    if (a < 0.04) continue;
+    const lv = Math.min(LEVELS - 1, (a * LEVELS) | 0);
+    for (let k = 0; k < w.shape.length; k++) blit(2, 9, lv, w.shape[k] === '~' ? G_WAVE : 2, w.x + k * CW, w.y);
+  }
+}
+
 function render(dt) {
   own.fill(-1);
   for (const f of fish) if (!f.away) f.draw();
@@ -654,6 +731,7 @@ function render(dt) {
   for (const f of foam) stampWake(f.x, f.y, f.k * f.life / f.max);
   ctx.clearRect(0, 0, W, H);
   ctx.font = `600 ${Math.round(CH * 1.02)}px 'JetBrains Mono', ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  drawWaves(dt);
   drawGlow();
   const rise = dt > 0 ? 1 - Math.exp(-dt * 30) : 1, fall = dt > 0 ? Math.exp(-dt * 16) : 0;
   for (const d of dust) blit(2, 9, 1 + ((d.l * 3) | 0), 14, d.x, d.y);
@@ -661,14 +739,25 @@ function render(dt) {
     const i = cy * cols + cx, X = cx * CW, Y = cy * CH;
     // A cell eases toward what the fish stamps into it and, once the fish has moved on, fades over ~150 ms.
     // Without this a cell is either on or off, and the body visibly hops from cell to cell.
-    if (own[i] >= 0) { showV[i] += (val[i] - showV[i]) * rise; showC[i] = col[i]; showG[i] = gly[i]; showO[i] = own[i]; }
+    if (own[i] >= 0) { showV[i] += (val[i] - showV[i]) * rise; showC[i] = col[i]; showG[i] = gly[i]; showO[i] = own[i]; showK[i] = keyB[i]; }
     else showV[i] *= fall;
     if (showV[i] > 0.05) {
       const v = showV[i], lv = Math.min(LEVELS - 1, (v * (LEVELS - 1) + 0.5) | 0), g = showG[i], c = showC[i];
       const hot = fish[showO[i]].glow > 0.35 ? 1 : 0;
       const sheer = g >= SHEER, gg = g & 7;
-      const glyph = gg === 1 ? G_EYE : gg >= 2 ? G_RAY + gg - 2 : Math.min(RAMP_N - 1, (v * RAMP_N) | 0);
-      blit(sheer ? 2 : hot, c, lv, glyph, X, Y);
+      if (!sheer && gg === 0) {
+        // shimmering scales: each cell re-rolls its character and the shade of its square on its own staggered clock,
+        // about every 6 s, so the skin drifts rather than flickers. Shades lean darker towards the spine and stay mostly in the
+        // middle of the band; one square in forty is a muted accent, and a few pale ones
+        // at the edge carry no character at all
+        const k = showK[i], tick = Math.floor(shimT * 0.17 + (k % 997) / 97), set = BANDS[Math.min(5, (v * 6) | 0)];
+        const h1 = hash(k % 100003, tick), h2 = hash((k >>> 7) % 100003, tick + 31);
+        const tone = h2 > 0.975 ? 5 : Math.max(0, Math.min(4, Math.round(0.9 + v * 1.6 + (h2 - 0.5) * 1.6)));
+        blit(hot, c, lv, v < 0.45 && h1 > 0.8 ? G_BARE : set[(h1 * set.length) | 0], X, Y, tone);
+      } else {
+        const glyph = gg === 1 ? G_EYE : gg >= 2 ? G_RAY + gg - 2 : Math.min(RAMP_N - 1, (v * RAMP_N) | 0);
+        blit(sheer ? 2 : hot, c, lv, glyph, X, Y, gg === 1 ? 4 : 1);   // the eye: a light mark on a dark square
+      }
     } else if (wakeB[i] > 0.05) {
       blit(2, 9, Math.min(LEVELS - 1, (wakeB[i] * LEVELS) | 0), wakeB[i] > 0.45 ? 1 : 0, X, Y);
     }
@@ -680,7 +769,7 @@ function frame(now) {
   // "Reduce motion" is often switched off for speed rather than comfort, so it slows the pond to a calm drift instead of
   // freezing it (a frozen pond reads as broken). Stopping it completely is the pause button's job.
   const still = paused;
-  if (!still) simulate(dt * (reduced.matches ? 0.35 : 1), now);
+  if (!still) { simulate(dt * (reduced.matches ? 0.35 : 1), now); shimT += dt * (reduced.matches ? 0.35 : 1); }
   else for (const f of fish) f.glow += ((f.mode !== 'free' ? 1 : 0) - f.glow) * 0.5;
   render(still ? 0 : dt);
   canvas.classList.add('is-ready');
