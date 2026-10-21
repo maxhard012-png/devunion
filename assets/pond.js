@@ -266,6 +266,8 @@ class Fish {
         want = p.speed * (far ? 6 : 1.5);
       }
       target *= 0.15;
+      // facing away, a called fish brakes into the turn instead of swinging round a huge arc at full speed
+      if (goal !== null) want *= 1 - 0.65 * Math.min(1, Math.abs(angDiff(goal, this.a)) / Math.PI * 1.4);
     }
     if (goal !== null) target = target * (1 - weight) + clamp(angDiff(goal, this.a) * 2.4, -turnMax, turnMax) * weight;
     target = clamp(target, -turnMax, turnMax);
@@ -287,6 +289,8 @@ class Fish {
       if (this.stroke < 0.8) { this.stroke += dt; thrust = Math.sin(Math.PI * Math.min(1, this.stroke / 0.8)) * this.power; }
       this.v += p.speed * 1.0 * thrust * dt;   // shorter, gentler strokes: speed swells ±30%, it never stalls
       this.v = Math.min(this.v * Math.exp(-dt * 0.35), p.speed * 2.4 * Math.max(1, rel));
+      // a called koi still strokes, but its speed is pulled straight toward the goal: strokes alone took up to 5 s to arrive
+      if (this.mode !== 'free') this.v += (want * 0.7 - this.v) * Math.min(1, dt * 2.5);
       this.amp += (0.32 + 0.9 * thrust - this.amp) * Math.min(1, dt * 3);
       this.phase += dt * (1.6 + 6 * this.amp);
     } else {
@@ -628,8 +632,10 @@ function render(dt) {
 function frame(now) {
   raf = 0;
   const dt = Math.min(0.05, (now - last) / 1000 || 0.016); last = now;
-  const still = reduced.matches;
-  if (!still) simulate(dt, now);
+  // "Reduce motion" is often switched off for speed rather than comfort, so it slows the pond to a calm drift instead of
+  // freezing it (a frozen pond reads as broken). Stopping it completely is the pause button's job.
+  const still = paused;
+  if (!still) simulate(dt * (reduced.matches ? 0.35 : 1), now);
   else for (const f of fish) f.glow += ((f.mode !== 'free' ? 1 : 0) - f.glow) * 0.5;
   render(still ? 0 : dt);
   canvas.classList.add('is-ready');
@@ -639,6 +645,21 @@ function frame(now) {
 function wake() { if (!raf && !document.hidden) { last = performance.now(); raf = requestAnimationFrame(frame); } }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
 reduced.addEventListener('change', wake);
+// pause: stops the pond on every page and is remembered (WCAG 2.2.2 — moving content that runs on its own can be stopped)
+let paused = false;
+try { paused = localStorage.getItem('devunion-pond-paused') === '1'; } catch {}
+const pauseBtn = document.querySelector('.pond-pause');
+function syncPause() {
+  if (!pauseBtn) return;
+  pauseBtn.setAttribute('aria-pressed', String(paused));
+  pauseBtn.classList.toggle('is-paused', paused);
+}
+if (pauseBtn) pauseBtn.addEventListener('click', () => {
+  paused = !paused; syncPause();
+  try { localStorage.setItem('devunion-pond-paused', paused ? '1' : '0'); } catch {}
+  wake();
+});
+syncPause();
 // a hidden pane can report a 0×0 viewport; rescaling from it would throw every fish to infinity
 addEventListener('resize', () => {
   const oldW = W, oldH = H; resize();

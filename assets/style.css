@@ -32,6 +32,13 @@ h1,h2,p{margin:0}
 .page{display:flex;flex-direction:column}   /* short pages keep the footer at the bottom */
 .page .page-main{flex:1}
 
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* stops the pond on every page; the glyph says what a press will do */
+.pond-pause{position:fixed;right:var(--gutter);bottom:18px;z-index:6;width:38px;height:38px;display:grid;place-items:center;border-radius:50%;cursor:pointer;
+  color:var(--ink2);background:var(--glass);border:1px solid var(--edge2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font:500 13px/1 var(--mono)}
+.pond-pause::before{content:"\2161"}
+.pond-pause.is-paused::before{content:"\25B6";font-size:11px}
+.pond-pause:hover{color:var(--ink);border-color:var(--ink3)}
 .skip{position:absolute;left:12px;top:-60px;z-index:20;padding:10px 14px;background:var(--ink);color:var(--water);border-radius:8px;text-decoration:none}
 .skip:focus{top:12px}
 
