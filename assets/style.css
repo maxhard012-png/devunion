@@ -150,7 +150,7 @@ h1,h2,p{margin:0}
 .about-toggle{display:inline-flex;align-items:center;gap:12px;padding:12px 16px;color:var(--ink2);cursor:default;
   background:var(--glass);border:1px solid var(--edge2);border-radius:999px;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);transition:border-color .2s,color .2s}
 .about-plus{font:400 16px/1 var(--mono);color:var(--fish);transition:transform .25s}
-.about-body{position:absolute;left:0;bottom:calc(100% + 10px);width:min(520px,calc(100vw - 2 * var(--gutter)));padding:22px 24px;
+.about-body{position:absolute;left:0;bottom:calc(100% + 10px);width:min(600px,calc(100vw - 2 * var(--gutter)));padding:22px 24px;
   background:var(--glass-strong);border:1px solid var(--edge);border-radius:16px;-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);
   opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .25s,transform .25s cubic-bezier(.2,.8,.2,1),visibility 0s .25s}
 .about-body::after{content:"";position:absolute;left:0;right:0;top:100%;height:12px}   /* hover bridge to the chip */
@@ -160,10 +160,17 @@ h1,h2,p{margin:0}
 .about-panel:focus-visible .about-toggle{outline:2px solid var(--fish);outline-offset:3px}
 .about-bait{font:500 11px/1 var(--mono);letter-spacing:0;text-transform:none;color:var(--fish);padding:5px 7px;border:1px solid color-mix(in srgb,var(--fish) 35%,transparent);border-radius:6px}
 .about-title{font:400 26px/1.1 var(--display);letter-spacing:-.025em}
-.about-lead{margin-top:8px;font-size:14px;line-height:1.55;color:var(--ink2)}
-.about-lead code{font:500 13px/1 var(--mono);color:var(--ink);white-space:nowrap}
+/* the panel reads in glances: a small label, then three short cards in a row; nothing longer than two lines */
+.about-label{margin:16px 0 8px;font:500 10.5px/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+.about-steps,.about-tiles{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.about-steps li,.about-tiles li{display:flex;flex-direction:column;gap:4px;padding:12px 12px 13px;border:1px solid var(--edge);border-radius:10px;background:var(--wash)}
+.about-steps b,.about-tiles b{font:500 14px/1.2 var(--display);color:var(--ink)}
+.about-steps li > span:last-child,.about-tiles li > span{font-size:12.5px;line-height:1.4;color:var(--ink2)}
+.about-steps i{font:500 12.5px/1 var(--mono);font-style:normal;color:var(--ink)}
+.about-steps code{font:500 12px/1 var(--mono);color:var(--ink);white-space:nowrap}
+.step-n{font:500 11px/1 var(--mono);color:var(--fish)}
 /* the live example: two sliders, the sum against the line at 1, and the verdict */
-.fork-demo{margin-top:16px;padding:14px 16px 12px;border:1px solid var(--edge);border-radius:12px;background:var(--wash)}
+.fork-demo{margin-top:8px;padding:14px 16px 12px;border:1px solid var(--edge);border-radius:12px;background:var(--wash)}
 .fd-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:4px;font:500 10.5px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
 .fd-head span:first-child{color:var(--ink2)}
 .fd-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 12px;margin-top:10px;font-size:13px;color:var(--ink2)}
@@ -185,11 +192,7 @@ h1,h2,p{margin:0}
 .fd-sum code{font:500 12.5px/1.3 var(--mono);color:var(--ink2);font-variant-numeric:tabular-nums}
 #fd-status{font:600 12.5px/1.3 var(--mono);color:var(--ink3);white-space:nowrap;transition:color .3s}
 .fork-demo.is-fork #fd-status{color:var(--fish)}
-.about-list{list-style:none;margin:12px 0 0;padding:0}
-.about-list li{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;padding:8px 0;border-top:1px solid var(--edge);font-size:13px;color:var(--ink2)}
-.about-list li:first-child{border-top:0}
-.about-list b{font-weight:500;color:var(--ink)}
-.about-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:10px}
+.about-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:14px}
 
 /* "Our projects" turns the dial over: the four sections fade back, the six projects come out on two arcs, Betting on the
    left and Web3 on the right, each arc marked on the dial itself */
@@ -294,6 +297,12 @@ textarea{resize:vertical;min-height:140px}
   .ring-text b{font-size:14px}
   .ring-hint{margin-top:10px;font-size:10px}
   .about-panel{bottom:28px}
+  /* on a phone the cards stack, each a single row: number or name on the left, the line beside it */
+  .about-steps,.about-tiles{grid-template-columns:minmax(0,1fr)}
+  .about-steps li,.about-tiles li{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;align-items:baseline}
+  .about-steps li > span:last-child{grid-column:2}
+  /* never taller than the screen under the header: the panel scrolls inside instead of running off the top */
+  .about-body{max-height:calc(100dvh - 180px);overflow-y:auto;overscroll-behavior:contain}
   /* six stations do not fit round a 300px dial: on a phone the projects stand in two columns, one per direction */
   .ring[data-view="projects"] .ring-ticks,.ring-span{display:none}
   .ring-sub{place-content:start center}
