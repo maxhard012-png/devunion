@@ -101,13 +101,16 @@ function paint(key) {
     // switching off. The glyph inverts against its square, so it always reads
     const hue = type ? L.hot : L.base, inset = Math.max(1, Math.round(dpr * 0.5));
     // a narrow band of shades around the fish's own colour: varied enough to read as scales, close enough to read as one skin
-    const tile = vr === 5 ? mix(L.accent, hue, 0.45) : mix(mix(hue, WHITE, 0.28), mix(hue, BLACK, 0.34), vr / 4), dark = vr === 4;
+    // On night water the band sits a step darker and every glyph is light, so the fish glow out of the dark instead
+    const tile = vr === 5 ? mix(L.accent, hue, 0.45) : night ? mix(mix(hue, BLACK, 0.12), mix(hue, BLACK, 0.48), vr / 4)
+      : mix(mix(hue, WHITE, 0.28), mix(hue, BLACK, 0.34), vr / 4), dark = night || vr === 4;
     actx.fillStyle = rgba(tile, 0.3 + 0.62 * v);
     actx.fillRect(x + inset * 0.5, y + inset * 0.5, sw - inset, sh - inset);
-    actx.fillStyle = dark ? rgba(mix(hue, WHITE, 0.86), 0.5 + 0.5 * v) : rgba(mix(hue, BLACK, 0.72), 0.45 + 0.55 * v);
+    actx.fillStyle = dark ? rgba(mix(hue, WHITE, 0.82), 0.5 + 0.5 * v) : rgba(mix(hue, BLACK, 0.72), 0.45 + 0.55 * v);
     actx.fillText(GLYPHS[g], x + sw / 2, y + sh / 2 + dpr * 0.5);
   } else {
-    actx.fillStyle = c === 9 ? rgba(L.base, 0.14 + 0.56 * v) : rgba(L.ink, 0.3 + 0.7 * v);
+    const ink = night ? (c === 9 ? mix(L.base, WHITE, 0.15) : mix(L.base, WHITE, 0.3)) : c === 9 ? L.base : L.ink;
+    actx.fillStyle = c === 9 ? rgba(ink, (night ? 0.1 : 0.14) + 0.56 * v) : rgba(ink, 0.3 + 0.7 * v);
     actx.fillText(GLYPHS[g], x + sw / 2, y + sh / 2);
   }
   painted[key] = 1;
@@ -117,10 +120,18 @@ function blit(type, c, lv, g, X, Y, vr = 0) {
   if (!painted[key]) paint(key);
   ctx.drawImage(atlas, (key % SPR_COLS) * sw, ((key / SPR_COLS) | 0) * sh, sw, sh, X, Y, CW, CH);
 }
-for (const b of $$('[data-guide]')) {
-  const c = PAL[GUIDE_DOT[b.dataset.guide]];
-  if (c) b.style.setProperty('--btn-fish', `rgb(${mix(c, BLACK, 0.35).join(',')})`);   // deep enough for borders and labels on light glass
+// theme: the page's <html data-theme> is light, dark or system (follow the device). Night water repaints the atlas
+const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+let night = false;
+const readTheme = () => { const t = document.documentElement.dataset.theme; night = t === 'dark' || (t === 'system' && darkMQ.matches); };
+function tintButtons() {
+  for (const b of $$('[data-guide]')) {
+    const c = PAL[GUIDE_DOT[b.dataset.guide]];
+    // deep enough for borders and labels on light glass; lifted on dark glass
+    if (c) b.style.setProperty('--btn-fish', `rgb(${(night ? mix(c, WHITE, 0.3) : mix(c, BLACK, 0.35)).join(',')})`);
+  }
 }
+readTheme(); tintButtons();
 
 // ── stamping into the grid ───────────────────────────────────────────
 let curId = 0, curDepth = 0;
@@ -634,6 +645,9 @@ addEventListener('pointermove', e => { pointer.x = e.clientX; pointer.y = e.clie
 document.addEventListener('pointerleave', () => pointer.on = false);
 // other scripts on the page can disturb the water (the fork example on the home page does when a fork appears)
 addEventListener('pond:ripple', e => { ripples.push({ x: e.detail.x, y: e.detail.y, r: 0, max: 150, speed: 110 }); wake(); });
+const retheme = () => { readTheme(); tintButtons(); buildAtlas(); wake(); };
+addEventListener('pond:theme', retheme);
+darkMQ.addEventListener('change', retheme);
 // a tap in open water: a ripple, and every fish near it bolts
 document.addEventListener('pointerdown', e => {
   if (e.target.closest('a,button,input,select,textarea,summary,label')) return;

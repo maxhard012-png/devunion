@@ -12,6 +12,10 @@ function language(next){lang=DICT[next]?next:'en';document.documentElement.lang=
  const tt=$('title[data-i-title]');if(tt)document.title=T(tt.dataset.iTitle)+' — DevUnion';
  if(picker)picker.value=lang;try{localStorage.setItem('devunion-lang',lang)}catch{};forkDemo(false)}
 if(picker)picker.addEventListener('change',()=>language(picker.value));
+// theme: light (default), dark, or the device's own; the <head> sets it before paint, this keeps the switch and the pond in step
+const themePick=$('.theme'),html=document.documentElement;
+function theme(m){m=['light','dark','system'].includes(m)?m:'light';html.dataset.theme=m;if(themePick)themePick.value=m;try{localStorage.setItem('devunion-theme',m)}catch{};dispatchEvent(new CustomEvent('pond:theme'))}
+if(themePick){themePick.value=html.dataset.theme||'light';themePick.addEventListener('change',()=>theme(themePick.value))}
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 if(!reduced.matches&&'IntersectionObserver'in window){document.body.classList.add('motion-ready');const observer=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');observer.unobserve(e.target)}}),{threshold:.05});$$('.reveal').forEach((el,i)=>{el.style.setProperty('--reveal-delay',(i%3)*80+'ms');observer.observe(el)})}
 // contact us: the brief is assembled here and copied or saved; nothing leaves the browser. ?project= preselects a project
