@@ -1,7 +1,7 @@
 // DevUnion — ASCII pond. Own engine: fish are rasterised into a fine glyph grid, every cell a coloured glyph,
 // blitted from a pre-drawn atlas (drawImage is far cheaper than fillText, which is what lets the grid be this fine).
 // Any element with data-guide owns one fish: hover calls it over, click sends it into the element and then navigates.
-// The page decides who lives in it: <canvas id="pond" data-fish="hammer,minnows">; no list means everyone.
+// The page decides who lives in it: <canvas id="pond" data-fish="hammer,koi">; no list means everyone.
 (() => {
 'use strict';
 const $$ = s => [...document.querySelectorAll(s)];
@@ -25,9 +25,9 @@ const PAL = [
   [206, 52, 44],    // 6 kohaku red
   [110, 140, 180],  // 7 sardine silver-blue
   [140, 150, 146],  // 8 small grey fish
-  [124, 124, 122],  // 9 water: dust, wakes, ripples (neutral grey: the page has no tint)
+  [124, 124, 122],  // 9 water: wakes and ripples (neutral grey: the page has no tint)
 ];
-const GUIDE_DOT = { hammer: 0, mako: 1, nurse: 2, koi: 3, koi3: 4, koi2: 6, school: 7 };
+const GUIDE_DOT = { hammer: 0, mako: 1, nurse: 2, koi: 3, koi3: 4, koi2: 6 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 // more colour, same lightness: each channel pushed away from the grey of its own mean
 const vivid = (c, k) => { const m = (c[0] + c[1] + c[2]) / 3; return c.map(v => clamp(Math.round(m + (v - m) * k), 0, 255)); };
@@ -78,7 +78,7 @@ function resize() {
   wakeB = new Float32Array(n);
   showV = new Float32Array(n); showC = new Uint8Array(n); showG = new Uint8Array(n); showO = new Int16Array(n);
   showK = new Uint32Array(n); keyB = new Uint32Array(n); bandB = new Uint8Array(n);
-  buildAtlas(); buildWaves();
+  buildAtlas();
   fish.forEach(f => f.rescale && f.rescale());
 }
 // Sprite layout: one atlas canvas per sprite type, so none grows past what the GPU keeps as a texture (one shared
@@ -235,7 +235,6 @@ function vnoise(x, y) {
 const fish = [];
 const pointer = { x: 0, y: 0, on: false, moved: 0 };
 const ripples = [];
-const dust = [];
 const foam = [];
 let guides = {}, clock = 0;
 
@@ -586,63 +585,16 @@ class Fish {
   }
 }
 
-// ── small fish: boids, each one a head cell and a tail ray ─────────────
-class School {
-  constructor(n, c, id) {
-    this.c = c; this.id = id; this.glow = 0; this.mode = 'free';
-    this.cx = W * (0.2 + Math.random() * 0.6); this.cy = H * (0.2 + Math.random() * 0.6);
-    this.f = Array.from({ length: n }, () => ({ x: this.cx + (Math.random() - .5) * 80, y: this.cy + (Math.random() - .5) * 60, vx: (Math.random() - .5) * 40, vy: (Math.random() - .5) * 40, ph: Math.random() * TAU }));
-    this.pickTarget();
-  }
-  pickTarget() { this.tx = W * (0.08 + Math.random() * 0.84); this.ty = H * (0.08 + Math.random() * 0.84); this.tTimer = 6 + Math.random() * 6; }
-  update(dt, t) {
-    let tx = this.tx, ty = this.ty, pull = 0.35, vmax = 95;
-    if (this.mode === 'free') { this.tTimer -= dt; if (this.tTimer < 0) this.pickTarget(); }
-    else {
-      const r = this.btn.getBoundingClientRect(), bx = r.left + r.width / 2, by = r.top + r.height / 2;
-      if (this.mode === 'call') { tx = bx; ty = by; pull = 3; vmax = 260; }
-      else { const a = t * 0.0014; tx = bx + Math.cos(a) * (r.width * 0.6 + 26); ty = by + Math.sin(a) * (r.height * 0.9 + 22); pull = 1.4; vmax = 170; }
-    }
-    let mx = 0, my = 0, mvx = 0, mvy = 0; const F = this.f, n = F.length;
-    for (const a of F) { mx += a.x; my += a.y; mvx += a.vx; mvy += a.vy; }
-    mx /= n; my /= n; mvx /= n; mvy /= n; this.cx = mx; this.cy = my;
-    for (const a of F) {
-      let ax = (mx - a.x) * 0.6 + (mvx - a.vx) * 1.2 + (tx - a.x) * pull * 0.5, ay = (my - a.y) * 0.6 + (mvy - a.vy) * 1.2 + (ty - a.y) * pull * 0.5;
-      for (const b of F) if (b !== a) { const dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy; if (d2 < 200) { ax += dx * 240 / (d2 + 1); ay += dy * 240 / (d2 + 1); } }
-      for (const s of fish) if (s.L && s.p.gait === 'cruise') { const dx = a.x - s.x, dy = a.y - s.y, d = Math.hypot(dx, dy); if (d < s.L * 0.6) { ax += dx / d * 900; ay += dy / d * 900; } }
-      if (pointer.on && this.mode === 'free') { const dx = a.x - pointer.x, dy = a.y - pointer.y, d = Math.hypot(dx, dy); if (d < 90) { ax += dx / (d + 1) * 1400; ay += dy / (d + 1) * 1400; } }
-      for (const r of ripples) if (!r.max || r.max > 60) { const dx = a.x - r.x, dy = a.y - r.y, d = Math.hypot(dx, dy); if (d < r.r + 40) { ax += dx / (d + 1) * 900; ay += dy / (d + 1) * 900; } }
-      // each fish darts a little on its own clock, so the school shimmers instead of sliding as one block
-      a.ph += dt * (3 + Math.random());
-      ax += Math.cos(a.ph) * 26; ay += Math.sin(a.ph * 1.3) * 26;
-      a.vx += ax * dt; a.vy += ay * dt;
-      const sp = Math.hypot(a.vx, a.vy); if (sp > vmax) { a.vx *= vmax / sp; a.vy *= vmax / sp; }
-      a.x += a.vx * dt; a.y += a.vy * dt;
-    }
-  }
-  draw() {
-    curId = this.id; curDepth = 0.5;
-    for (const a of this.f) {
-      const sp = Math.hypot(a.vx, a.vy) || 1, dx = a.vx / sp, dy = a.vy / sp;
-      stamp(a.x, a.y, 0.85, this.c, 0);
-      stamp(a.x - dx * CW * 1.1, a.y - dy * CH * 1.1, 0.7, this.c, rayCode(dx, dy) + SHEER);
-      stamp(a.x - dx * CW * 2.1, a.y - dy * CH * 2.1, 0.45, this.c, rayCode(dx, dy) + SHEER);
-    }
-  }
-}
-
 function populate() {
   fish.length = 0;
-  const all = ['hammer', 'mako', 'nurse', 'koi', 'koi2', 'koi3', 'school', 'minnows'];
+  const all = ['hammer', 'mako', 'nurse', 'koi', 'koi2', 'koi3'];
   const kinds = canvas.dataset.fish ? canvas.dataset.fish.split(',').map(k => k.trim()).filter(k => all.includes(k)) : all;
   guides = {};
   kinds.forEach(k => {
     const id = fish.length;
-    const f = k === 'school' ? new School(W < 640 ? 16 : 26, 7, id) : k === 'minnows' ? new School(W < 640 ? 10 : 18, 8, id) : new Fish(k, id);
+    const f = new Fish(k, id);
     fish.push(f); guides[k] = f;
   });
-  dust.length = 0;
-  for (let i = 0; i < (W < 640 ? 50 : 120); i++) dust.push({ x: Math.random() * W, y: Math.random() * H, p: Math.random() * 6, l: Math.random() });
 }
 
 // ── elements call their fish ─────────────────────────────────────────
@@ -690,11 +642,6 @@ function simulate(dt, t) {
   clock = t;
   for (const f of fish) {
     f.glow += ((f.mode !== 'free' ? 1 : 0) - f.glow) * Math.min(1, dt * 5);
-    if (f instanceof School) {
-      f.update(dt, t);
-      if (f.mode === 'call' && f.arrive) { const r = f.btn.getBoundingClientRect(); if (Math.hypot(f.cx - r.left - r.width / 2, f.cy - r.top - r.height / 2) < 50) f.arrive(); }
-      continue;
-    }
     if (f.away) {
       f.awayT -= dt;
       if (f.awayT > 0 && f.mode === 'free') continue;
@@ -715,16 +662,14 @@ function simulate(dt, t) {
   for (let i = ripples.length - 1; i >= 0; i--) { const r = ripples[i]; r.r += r.speed * dt; if (r.r > r.max) ripples.splice(i, 1); }
   const k = Math.pow(0.2, dt);
   for (let i = 0; i < wakeB.length; i++) wakeB[i] *= k;
-  // motes ride the same current as the streaks, at half its speed (they sit a little deeper), and wrap at the edges
-  for (const d of dust) { d.p += dt * 0.5; const [u, v] = flow(d.x, d.y); d.x = (d.x + u * 0.5 * dt + W) % W; d.y = (d.y + v * 0.5 * dt + H) % H; }
 }
 // a called fish swims in its own light: soft tinted pools along the spine, laid on the water under the tiles
 function drawGlow() {
   const breathe = 0.85 + 0.15 * Math.sin(clock * 0.004);
   for (const f of fish) {
     if (f.glow < 0.02 || f.away) continue;
-    const c = LOOK[f.p ? f.p.col : f.c].glow, k = 0.3 * f.glow * breathe;
-    const pools = f.f ? [[f.cx, f.cy, 90]] : [0.08, 0.28, 0.48, 0.68, 0.88].map(u => { const a = f.at(u); return [a.x, a.y, a.w * 2.8 + 30]; });
+    const c = LOOK[f.p.col].glow, k = 0.3 * f.glow * breathe;
+    const pools = [0.08, 0.28, 0.48, 0.68, 0.88].map(u => { const a = f.at(u); return [a.x, a.y, a.w * 2.8 + 30]; });
     for (const [x, y, r] of pools) {
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, rgba(c, k)); g.addColorStop(0.5, rgba(c, k * 0.4)); g.addColorStop(1, rgba(c, 0));
@@ -732,85 +677,6 @@ function drawGlow() {
     }
   }
 }
-// ── the current: a slow, coherent flow that the water's marks ride ──────
-// The pond has one current: a steady drift to the right and a little down, with broad slow eddies turning in it. It is
-// the curl of a stream function, so it never piles up or empties anywhere: marks follow it like dye in water, not
-// at random. Speeds stay around 5–20 px/s, well below the fish, so the water reads as calm.
-let flowT = 0;
-// ψ = A·sin(x/260 + 0.03t)·sin(y/300) + B·sin((0.6x + y)/420 − 0.05t); velocity = (∂ψ/∂y, −∂ψ/∂x) plus the drift (7, 2)
-const EDDY = 9 * 300, BAND = 6 * 420;
-function flow(x, y) {
-  const s1 = x / 260 + flowT * 0.03, c1 = y / 300, cq = Math.cos((0.6 * x + y) / 420 - flowT * 0.05);
-  return [7 + EDDY / 300 * Math.sin(s1) * Math.cos(c1) + BAND / 420 * cq,
-    2 - EDDY / 260 * Math.cos(s1) * Math.sin(c1) - 0.6 * BAND / 420 * cq];
-}
-// Fish move water: near a fish the current is pulled along its heading, strongest close to the body and fading out at
-// about half a body length, so marks bend around a passing fish and are dragged into its wake.
-function waterAt(x, y) {
-  let [u, v] = flow(x, y);
-  for (const f of fish) {
-    if (!f.L || f.away) continue;
-    const R = f.L * 0.5 + 40, d = Math.hypot(x - f.x, y - f.y);
-    if (d >= R) continue;
-    const k = (1 - d / R) ** 2 * 0.55 * f.v;
-    u += Math.cos(f.a) * k; v += Math.sin(f.a) * k;
-  }
-  return [u, v];
-}
-// Marks on the water, on two layers. Surface streaks are strokes whose characters turn with the current (− \ | /),
-// led by a "~"; deep ones ride the same current at half speed, dimmer, as a dotted line (. , :), so the water has depth.
-// A crest of brightness runs along every stroke from tail to head, so a streak rolls instead of just sliding.
-// Characters sit at fixed distances behind the moving head along its own path, so they glide continuously rather than
-// stepping cell by cell. Each fades in, rides 6–12 s, fades out and starts again elsewhere. About one per 26 000 px².
-const streaks = [];
-const DEEP = [0, 16, 1];                    // . , :
-function seedStreak(s, fresh) {
-  s.deep = Math.random() < 0.4;
-  s.x = Math.random() * W; s.y = Math.random() * H; s.trail = [[s.x, s.y]];
-  s.len = s.deep ? 3 + ((Math.random() * 4) | 0) : 4 + ((Math.random() * 5) | 0);
-  s.life = 6 + Math.random() * 6; s.age = fresh ? Math.random() * s.life : 0;
-  s.peak = s.deep ? 0.5 + Math.random() * 0.2 : 0.65 + Math.random() * 0.3;
-  s.crest = Math.random() * TAU;
-  return s;
-}
-function buildWaves() {
-  const n = Math.min(70, Math.round(W * H / 26000));
-  streaks.length = 0;
-  for (let i = 0; i < n; i++) streaks.push(seedStreak({}, true));
-}
-function drawWaves(dt) {
-  flowT += dt;
-  for (const s of streaks) {
-    s.age += dt; s.crest += dt * 3.2;
-    const sp = s.deep ? 0.5 : 1;
-    // midpoint step: follows the curve of an eddy instead of cutting across it
-    const [u0, v0] = waterAt(s.x, s.y), [u1, v1] = waterAt(s.x + u0 * sp * dt / 2, s.y + v0 * sp * dt / 2);
-    s.x += u1 * sp * dt; s.y += v1 * sp * dt;
-    const T = s.trail, last = T[0];
-    if (Math.hypot(s.x - last[0], s.y - last[1]) >= 2) { T.unshift([s.x, s.y]); if (T.length > s.len * CW) T.pop(); }
-    if (s.age >= s.life || s.x < -40 || s.x > W + 40 || s.y < -40 || s.y > H + 40) { seedStreak(s, false); continue; }
-    const a = Math.sin(Math.PI * Math.min(1, s.age / s.life)) * s.peak;    // swells in, fades out
-    if (a < 0.03) continue;
-    // walk back along the path from the live head, dropping a character every CW px of arc length
-    let k = 0, want = 0, acc = 0, px = s.x, py = s.y;
-    for (let j = 0; j <= T.length && k < s.len; j++) {
-      const qx = j < T.length ? T[j][0] : px, qy = j < T.length ? T[j][1] : py, seg = Math.hypot(qx - px, qy - py);
-      while (k < s.len && acc + seg >= want) {
-        const t = seg ? (want - acc) / seg : 0, x = px + (qx - px) * t, y = py + (qy - py) * t;
-        const crest = 0.72 + 0.28 * Math.sin(s.crest - k * 0.9);
-        const fade = a * (1 - 0.55 * k / Math.max(1, s.len - 1)) * crest, lv = Math.min(LEVELS - 1, (fade * LEVELS) | 0);
-        if (lv >= 1) {
-          const glyph = s.deep ? DEEP[k % 3] : k === 0 ? G_WAVE : G_RAY + rayCode(px - qx || 1e-3, py - qy) - 2;
-          blit(2, 9, lv, glyph, x - CW / 2, y - CH / 2);
-        }
-        k++; want = k * CW;
-      }
-      acc += seg; px = qx; py = qy;
-      if (j === T.length) break;
-    }
-  }
-}
-
 function render(dt) {
   own.fill(-1);
   for (const f of fish) if (!f.away) f.draw();
@@ -821,10 +687,8 @@ function render(dt) {
   for (const f of foam) stampWake(f.x, f.y, f.k * f.life / f.max);
   ctx.clearRect(0, 0, W, H);
   ctx.font = `600 ${Math.round(CH * 1.02)}px 'JetBrains Mono', ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  drawWaves(dt);
   drawGlow();
   const rise = dt > 0 ? 1 - Math.exp(-dt * 20) : 1, fall = dt > 0 ? Math.exp(-dt * 11) : 0;
-  for (const d of dust) blit(2, 9, 1 + ((d.l * 3) | 0), 14, d.x, d.y);
   for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
     const i = cy * cols + cx, X = cx * CW, Y = cy * CH;
     // A cell eases toward what the fish stamps into it and, once the fish has moved on, fades over ~250 ms.
@@ -896,8 +760,7 @@ addEventListener('resize', () => {
   if (!W || !H) return;
   fish.forEach(f => {
     const kx = oldW ? W / oldW : 1, ky = oldH ? H / oldH : 1;
-    if (f.f) f.f.forEach(a => { a.x = Math.min(W, a.x * kx); a.y = Math.min(H, a.y * ky); });
-    else { f.x = Math.min(W, f.x * kx); f.y = Math.min(H, f.y * ky); f.resetTrail(); }
+    f.x = Math.min(W, f.x * kx); f.y = Math.min(H, f.y * ky); f.resetTrail();
     f.pickTarget();
   });
   wake();
@@ -909,5 +772,5 @@ resize(); populate();
 // settle the pond before the first visible frame, so fish are mid-swim, not spawning
 for (let i = 0; i < 120; i++) simulate(1 / 60, i * 16.7);
 wake();
-window.__pond = { fish, guides, streaks };
+window.__pond = { fish, guides };
 })();
