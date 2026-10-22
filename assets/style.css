@@ -14,7 +14,7 @@
   --danger:#c02f22;
   --display:'Onest',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
   --gutter:clamp(16px,4vw,48px); --wrap:1180px; --r:12px;
-  color-scheme:light;
+  color-scheme:only light;   /* "only": a browser's forced dark mode must not repaint the light pond */
 }
 /* night water: the same tokens, deep and dark; text clears WCAG AA on --water and on glass. Chosen with the theme switch
    ("dark"), or followed from the system ("system"); light is the default */
@@ -24,7 +24,7 @@
   --glass:rgba(32,32,32,.62); --glass-strong:rgba(36,36,36,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
   --wash:rgba(255,255,255,.05); --sunk:rgba(0,0,0,.28); --veil:rgba(23,23,23,.96); --scrim:rgba(0,0,0,.5);
   --danger:#ff8a7c;
-  color-scheme:dark;
+  color-scheme:only dark;
 }
 @media (prefers-color-scheme:dark){
   :root[data-theme="system"]{
@@ -33,7 +33,7 @@
     --glass:rgba(32,32,32,.62); --glass-strong:rgba(36,36,36,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
     --wash:rgba(255,255,255,.05); --sunk:rgba(0,0,0,.28); --veil:rgba(23,23,23,.96); --scrim:rgba(0,0,0,.5);
     --danger:#ff8a7c;
-    color-scheme:dark;
+    color-scheme:only dark;
   }
 }
 :lang(zh){--display:'Onest','PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif;--mono:'JetBrains Mono','PingFang SC','Microsoft YaHei',ui-monospace,monospace}
@@ -117,7 +117,7 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .caret{display:inline-block;width:.55em;height:1.05em;margin-left:.1em;background:var(--fish);vertical-align:-.15em;animation:caret 1.1s steps(1) infinite}
 @keyframes caret{50%{opacity:0}}
 /* Chinese and Korean have no capitals and read badly tracked out */
-:lang(zh) :is(.eyebrow,.ring-label,.ring-hint,.fd-head),:lang(ko) :is(.eyebrow,.ring-label,.ring-hint,.fd-head){letter-spacing:.02em}
+:lang(zh) :is(.eyebrow,.ring-label,.ring-hint),:lang(ko) :is(.eyebrow,.ring-label,.ring-hint){letter-spacing:.02em}
 .button{display:inline-flex;align-items:center;gap:8px;font:600 13.5px/1 var(--mono);letter-spacing:.01em;color:var(--water);background:var(--fish);border:0;border-radius:10px;padding:14px 18px;text-decoration:none;cursor:pointer;transition:filter .2s,transform .2s}
 .button:hover{filter:brightness(1.12);transform:translateY(-1px)}
 .reset,.small-link{font:500 13px/1 var(--mono);color:var(--ink2);background:none;border:0;padding:14px 4px;cursor:pointer;text-decoration:none}
@@ -186,80 +186,6 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .ring-main .ring-item:nth-child(4){animation-delay:.61s}
 .ring-item:hover,.ring-item:focus-visible,.ring-item.is-called{background:var(--glass-strong);border-color:var(--btn-fish);scale:1.05}
 .ring-item:focus-visible{outline-color:var(--btn-fish)}
-
-
-/* "what we do" stays folded into a chip until hovered or focused, so the water keeps the space; it opens upward */
-.about-panel{position:absolute;left:var(--gutter);bottom:76px;pointer-events:auto;outline:none}
-.about-toggle{display:inline-flex;align-items:center;gap:12px;padding:12px 16px;color:var(--ink2);cursor:default;
-  background:var(--glass);border:1px solid var(--edge2);border-radius:999px;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);transition:border-color .2s,color .2s}
-.about-plus{font:400 16px/1 var(--mono);color:var(--fish);transition:transform .25s}
-.about-body{position:absolute;left:0;bottom:calc(100% + 10px);width:min(600px,calc(100vw - 2 * var(--gutter)));padding:22px 24px;
-  background:var(--glass-strong);border:1px solid var(--edge);border-radius:16px;-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);
-  opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .25s,transform .25s cubic-bezier(.2,.8,.2,1),visibility 0s .25s}
-.about-body::after{content:"";position:absolute;left:0;right:0;top:100%;height:12px}   /* hover bridge to the chip */
-.about-panel:hover .about-toggle,.about-panel:focus-within .about-toggle,.about-panel.is-open .about-toggle{color:var(--ink);border-color:var(--fish)}
-.about-panel:hover .about-plus,.about-panel:focus-within .about-plus,.about-panel.is-open .about-plus{transform:rotate(45deg)}
-.about-panel:hover .about-body,.about-panel:focus-within .about-body,.about-panel.is-open .about-body{opacity:1;visibility:visible;transform:none;transition:opacity .25s,transform .25s cubic-bezier(.2,.8,.2,1)}
-.about-panel:focus-visible .about-toggle{outline:2px solid var(--fish);outline-offset:3px}
-.about-bait{font:500 11px/1 var(--mono);letter-spacing:0;text-transform:none;color:var(--fish);padding:5px 7px;border:1px solid color-mix(in srgb,var(--fish) 35%,transparent);border-radius:6px}
-.about-title{font:400 26px/1.1 var(--display);letter-spacing:-.025em}
-/* the panel reads in glances: a small label, then three short cards in a row; nothing longer than two lines */
-.about-label{margin:16px 0 8px;font:500 10.5px/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
-.about-steps,.about-tiles{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.about-steps li,.about-tiles li{display:flex;flex-direction:column;gap:4px;padding:12px 12px 13px;border:1px solid var(--edge);border-radius:10px;background:var(--wash)}
-.about-steps b,.about-tiles b{font:500 14px/1.2 var(--display);color:var(--ink)}
-.about-steps li > span:last-child,.about-tiles li > span{font-size:12.5px;line-height:1.4;color:var(--ink2)}
-.about-steps i{font:500 12.5px/1 var(--mono);font-style:normal;color:var(--ink)}
-.about-steps code{font:500 12px/1 var(--mono);color:var(--ink);white-space:nowrap}
-.step-n{font:500 11px/1 var(--mono);color:var(--fish)}
-/* the live example: two sliders, the sum against the line at 1, and the verdict */
-.fork-demo{margin-top:8px;padding:14px 16px 12px;border:1px solid var(--edge);border-radius:12px;background:var(--wash)}
-.fd-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:4px;font:500 10.5px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
-.fd-head span:first-child{color:var(--ink2)}
-.fd-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 12px;margin-top:10px;font-size:13px;color:var(--ink2)}
-.fd-row i{font:500 13px/1 var(--mono);font-style:normal;color:var(--ink)}
-.fd-row output{font:500 13px/1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
-.fork-demo input[type=range]{grid-column:1/-1;-webkit-appearance:none;appearance:none;height:20px;padding:0;border:0;background:none;box-shadow:none;cursor:pointer}
-.fork-demo input[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:2px;background:var(--edge2)}
-.fork-demo input[type=range]::-moz-range-track{height:2px;border-radius:2px;background:var(--edge2)}
-.fork-demo input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-6px;border-radius:50%;background:var(--ink);border:3px solid var(--water);box-shadow:0 0 0 1px var(--edge2)}
-.fork-demo input[type=range]::-moz-range-thumb{width:8px;height:8px;border-radius:50%;background:var(--ink);border:3px solid var(--water);box-shadow:0 0 0 1px var(--edge2)}
-.fork-demo input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 2px var(--fish)}
-.fork-demo input[type=range]:focus-visible::-moz-range-thumb{box-shadow:0 0 0 2px var(--fish)}
-.fd-scale{position:relative;height:6px;margin:16px 0 18px;border-radius:3px;background:var(--wash)}
-#fd-fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ink3);transition:width .15s,background-color .3s}
-.fork-demo.is-fork #fd-fill{background:var(--fish)}
-/* the line at 1: the scale runs 0…1.4, so 1 sits at 1/1.4 of the width */
-.fd-one{position:absolute;left:71.43%;top:-4px;height:14px;border-left:1px solid var(--ink2);font:500 10px/1 var(--mono);color:var(--ink3);padding-top:17px;text-indent:-3px}
-.fd-sum{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.fd-sum code{font:500 12.5px/1.3 var(--mono);color:var(--ink2);font-variant-numeric:tabular-nums}
-#fd-status{font:600 12.5px/1.3 var(--mono);color:var(--ink3);white-space:nowrap;transition:color .3s}
-.fork-demo.is-fork #fd-status{color:var(--fish)}
-.about-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:14px}
-
-/* "Our projects" turns the dial over: the four sections fade back, the six projects come out on two arcs, Betting on the
-   left and Web3 on the right, each arc marked on the dial itself */
-.ring-items{transition:opacity .35s,scale .45s cubic-bezier(.2,.8,.2,1),visibility 0s}
-.ring[data-view="main"] .ring-projects,.ring[data-view="projects"] .ring-main{opacity:0;visibility:hidden;scale:.9;transition:opacity .25s,scale .35s,visibility 0s .35s}
-.ring-span{position:absolute;inset:0;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .45s;
-  background:conic-gradient(from var(--from),var(--ink2) 0deg 90deg,transparent 90deg);
-  -webkit-mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 4px) calc(100% - 1px),transparent 100%);
-  mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 4px) calc(100% - 1px),transparent 100%)}
-.ring-span-betting{--from:225deg}
-.ring-span-web3{--from:45deg}
-.ring[data-view="projects"] .ring-span{opacity:.6}
-.ring-word,.ring-hint{transition:opacity .3s}
-.ring[data-view="projects"] .ring-word,.ring[data-view="projects"] .ring-hint{opacity:0}
-.ring-sub{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s}
-.ring[data-view="projects"] .ring-sub{opacity:1;visibility:visible;transition:opacity .3s .1s}
-.ring-title{position:relative;font:300 calc(var(--D) * .075)/1 var(--display);letter-spacing:-.04em}
-.ring-back{margin-top:18px;font:500 12px/1 var(--mono);color:var(--ink2);background:var(--glass);border:1px solid var(--edge2);border-radius:999px;padding:9px 14px;cursor:pointer;pointer-events:auto;
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.ring-back:hover{color:var(--ink);border-color:var(--ink3)}
-.ring-label{position:absolute;left:50%;top:50%;margin:0;transform:translate(-50%,-50%) rotate(var(--a)) translate(calc(var(--R) + 30px)) rotate(calc(var(--a) * -1));
-  font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);white-space:nowrap}
-.ring-item.is-soon{cursor:default;border-style:dashed;background:var(--wash)}
-.ring-item.is-soon:hover{scale:none;background:var(--wash);border-color:var(--edge2)}
 
 /* the round go-button, shared by the catalogue rows */
 .card-go{width:40px;height:40px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--edge2);color:var(--ink2);transition:background-color .2s,color .2s,border-color .2s}
@@ -330,8 +256,6 @@ textarea{resize:vertical;min-height:140px}
 /* ── narrow screens ─────────────────────────────────────────────────── */
 @media (max-width:860px){
   .project-groups,.directions,.brief-layout{grid-template-columns:minmax(0,1fr)}
-  .about-body{position:static;width:auto;margin-top:10px;display:none}   /* on a phone it opens in place, under the chip */
-  .about-panel:focus-within .about-body,.about-panel.is-open .about-body{display:block}
 }
 @media (max-width:640px){
   /* the path bar takes its own row under the switchers, shows the mark without the name, and wraps if it must */
@@ -346,13 +270,6 @@ textarea{resize:vertical;min-height:140px}
   .ring-text small{display:none}
   .ring-text b{font-size:14px}
   .ring-hint{margin-top:10px;font-size:10px}
-  .about-panel{bottom:28px}
-  /* on a phone the cards stack, each a single row: number or name on the left, the line beside it */
-  .about-steps,.about-tiles{grid-template-columns:minmax(0,1fr)}
-  .about-steps li,.about-tiles li{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;align-items:baseline}
-  .about-steps li > span:last-child{grid-column:2}
-  /* never taller than the screen under the header: the panel scrolls inside instead of running off the top */
-  .about-body{max-height:calc(100dvh - 180px);overflow-y:auto;overscroll-behavior:contain}
   /* six stations do not fit round a 300px dial: on a phone the projects stand in two columns, one per direction */
   .ring[data-view="projects"] .ring-ticks,.ring-span{display:none}
   .ring-sub{place-content:start center}

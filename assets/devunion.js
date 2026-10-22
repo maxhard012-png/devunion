@@ -10,7 +10,7 @@ function language(next){lang=DICT[next]?next:'en';document.documentElement.lang=
  $$('[data-i]').forEach(el=>el.innerHTML=T(el.dataset.i));
  $$('[data-i-aria]').forEach(el=>el.setAttribute('aria-label',T(el.dataset.iAria)));
  const tt=$('title[data-i-title]');if(tt)document.title=T(tt.dataset.iTitle)+' — DevUnion';
- if(picker)picker.value=lang;try{localStorage.setItem('devunion-lang',lang)}catch{};forkDemo(false)}
+ if(picker)picker.value=lang;try{localStorage.setItem('devunion-lang',lang)}catch{}}
 if(picker)picker.addEventListener('change',()=>language(picker.value));
 // theme: light (default), dark, or the device's own; the <head> sets it before paint, this keeps the switch and the pond in step
 const themePick=$('.theme'),html=document.documentElement;
@@ -33,20 +33,6 @@ if($('#brief-form')){const form=$('#brief-form'),status=$('#brief-status'),pick=
  function brief(){if(!form.reportValidity())return null;const data=new FormData(form);return `DevUnion — ${T('b_head')}\n\n${T('f_project')}: ${pick.selectedOptions[0].textContent}\n${T('b_task')}: ${data.get('task')}\n${T('b_contact')}: ${data.get('contact')||'—'}\n`}
  form.addEventListener('submit',async e=>{e.preventDefault();const value=brief();if(!value)return;try{await navigator.clipboard.writeText(value);status.textContent=T('s_copied')}catch{status.textContent=T('s_noclip')}});
  $('#brief-download').addEventListener('click',()=>{const value=brief();if(!value)return;const url=URL.createObjectURL(new Blob([value],{type:'text/plain;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='DevUnion-brief.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent=T('s_saved')})}
-// home "what we do": a live fork example. 1/k + p below one is a fork; the edge is what a split bank returns before fees.
-// When the sliders first cross into a fork, the pond gets a ripple beside the panel, as if something bit.
-const fdK=$('#fd-k'),fdP=$('#fd-p');let forkWas=null;
-function forkDemo(fromUser){if(!fdK)return;const k=+fdK.value,p=+fdP.value,s=1/k+p,fork=s<1,edge=(1/s-1)*100,fill=Math.min(s/1.4,1);
-$('#fd-k-out').textContent=nf(k,2);$('#fd-p-out').textContent=nf(p,2);$('#fd-formula').textContent=`1 / ${nf(k,2)} + ${nf(p,2)} = ${nf(s,3)}`;
-$('#fd-fill').style.width=fill*100+'%';$('.fork-demo').classList.toggle('is-fork',fork);
-$('#fd-status').textContent=fork?T('fork_yes').replace('{e}',nf(edge,1)):T('fork_no');
-if(fromUser&&fork&&forkWas===false){const r=$('.about-panel').getBoundingClientRect(),b=$('.fd-scale').getBoundingClientRect();dispatchEvent(new CustomEvent('pond:ripple',{detail:{x:r.right+70,y:b.top+b.height/2}}))}
-forkWas=fork}
-if(fdK)[fdK,fdP].forEach(el=>el.addEventListener('input',()=>forkDemo(true)));
-// the explainer opens on hover or focus, and a tap on its chip pins it open: on a phone, touching a slider would otherwise
-// move focus and close it mid-gesture. A tap anywhere else or Escape closes it.
-const about=$('.about-panel');
-if(about){$('.about-toggle').addEventListener('click',()=>about.classList.toggle('is-open'));document.addEventListener('pointerdown',e=>{if(!e.target.closest('.about-panel'))about.classList.remove('is-open')});about.addEventListener('keydown',e=>{if(e.key==='Escape'){about.classList.remove('is-open');about.blur()}})}
 // home ring: hovering or focusing a station slides the lit arc round the dial to it, in that fish's colour
 const arc=$('.ring-arc'),phone=matchMedia('(max-width:640px)');
 if(arc)$$('.ring-item').forEach(it=>{const on=()=>{if(phone.matches&&it.closest('.ring-projects'))return;const cs=getComputedStyle(it),a=parseFloat(cs.getPropertyValue(phone.matches?'--am':'--a'));arc.style.setProperty('--arc-from',(a+90-20)+'deg');arc.style.setProperty('--arc-color',cs.getPropertyValue('--btn-fish')||'var(--fish)');arc.classList.add('is-lit')},off=()=>arc.classList.remove('is-lit');it.addEventListener('pointerenter',on);it.addEventListener('focus',on);it.addEventListener('pointerleave',off);it.addEventListener('blur',off)});
