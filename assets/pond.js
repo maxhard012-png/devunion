@@ -205,14 +205,16 @@ const lerpTable = (t, u) => {
   return 0;
 };
 // gait: 'cruise' is a shark's steady sweep; 'burst' is a koi's kick-and-glide
+// speeds tuned to the reference video (2026-10-23): about 0.18 body lengths a second for every fish, a touch slower
+// than ascii-sharks (~0.2 for its hammerheads), as the client asked
 const PLANS = {
-  hammer: { len: 300, speed: 46, turn: 0.9, wander: 0.32, wave: 0.05, col: 0, depth: 3, gait: 'cruise',
+  hammer: { len: 300, speed: 82, turn: 0.9, wander: 0.32, wave: 0.05, col: 0, depth: 3, gait: 'cruise',
     body: [[0, .02], [.05, .03], [.1, .045], [.28, .068], [.45, .058], [.65, .034], [.84, .013], [1, .006]] },
-  mako: { len: 250, speed: 55, turn: 1.1, wander: 0.38, wave: 0.045, col: 1, depth: 2.6, gait: 'cruise',
+  mako: { len: 250, speed: 62, turn: 1.1, wander: 0.38, wave: 0.045, col: 1, depth: 2.6, gait: 'cruise',
     body: [[0, 0], [.06, .025], [.16, .05], [.32, .066], [.5, .05], [.7, .028], [.84, .011], [1, .005]] },
-  nurse: { len: 270, speed: 28, turn: 0.75, wander: 0.28, wave: 0.06, col: 2, depth: 2.2, gait: 'cruise',
+  nurse: { len: 270, speed: 64, turn: 0.75, wander: 0.28, wave: 0.06, col: 2, depth: 2.2, gait: 'cruise',
     body: [[0, .04], [.04, .062], [.2, .085], [.4, .08], [.6, .055], [.8, .03], [1, .012]] },
-  koi: { len: 150, speed: 38, turn: 2.0, wander: 0.7, wave: 0.075, col: 3, depth: 1.4, gait: 'burst', koi: [3, 4, 5],
+  koi: { len: 150, speed: 44, turn: 2.0, wander: 0.7, wave: 0.075, col: 3, depth: 1.4, gait: 'burst', koi: [3, 4, 5],
     body: [[0, .03], [.05, .07], [.2, .105], [.42, .1], [.62, .07], [.76, .036], [.8, .03], [1, 0]] },
   koi2: { len: 138, speed: 40, turn: 2.1, wander: 0.75, wave: 0.075, col: 6, depth: 1.2, gait: 'burst', koi: [6, 4, 4],
     body: [[0, .03], [.05, .07], [.2, .1], [.42, .098], [.62, .068], [.76, .035], [.8, .03], [1, 0]] },
