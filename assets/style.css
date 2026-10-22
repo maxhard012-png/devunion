@@ -294,17 +294,16 @@ textarea{resize:vertical;min-height:140px}
   .ring-text small{display:none}
   .ring-text b{font-size:14px}
   .ring-hint{margin-top:10px;font-size:10px}
-  /* six stations do not fit round a 300px dial: on a phone the projects stand in two columns, one per direction */
-  .ring[data-view="projects"] .ring-ticks,.ring-span{display:none}
-  .ring-sub{place-content:start center}
+  /* six stations do not fit round a 300px dial: on a phone the projects stand on a tall oval instead, Betting arched
+     over the top and Web3 under the bottom, each direction's label beyond its arc. --am is the angle on that oval */
+  .ring[data-view="projects"] .ring-span{display:none}
   .ring-title{font-size:26px}
   .ring-back{margin-top:12px}
-  .ring-projects{inset:96px auto auto 50%;width:min(358px,calc(100vw - 32px));translate:-50% 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-    grid-template-rows:repeat(4,auto);grid-auto-flow:column;gap:8px}
-  .ring-projects .ring-item,.ring-projects .ring-label{position:static;transform:none}
-  .ring-projects .ring-item{white-space:normal}
-  .ring-projects .ring-text small{display:block}
-  .ring-projects .ring-label{padding:4px 2px}
+  .ring-projects{--rx:min(25vw,100px);--ry:calc(var(--R) + 26px)}
+  .ring-projects .ring-item,.ring-projects .ring-label{transform:translate(-50%,-50%) translate(calc(cos(var(--am)) * var(--rx)),calc(sin(var(--am)) * var(--ry)))}
+  .ring-projects .ring-item{padding:8px 11px;gap:6px}
+  .ring-projects .ring-text small{display:block;font-size:10px}
+  .ring-projects .ring-label{--rx:0px;--ry:calc(var(--R) + 74px)}
   .catalog-row{grid-template-columns:minmax(0,1fr) 40px;padding:16px}
   .row-note{grid-column:1;grid-row:2}
   .catalog-row .card-go{grid-column:2;grid-row:1}
