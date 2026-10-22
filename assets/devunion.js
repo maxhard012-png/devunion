@@ -16,6 +16,15 @@ if(picker)picker.addEventListener('change',()=>language(picker.value));
 const themePick=$('.theme'),html=document.documentElement;
 function theme(m){m=['light','dark','system'].includes(m)?m:'light';html.dataset.theme=m;if(themePick)themePick.value=m;try{localStorage.setItem('devunion-theme',m)}catch{};dispatchEvent(new CustomEvent('pond:theme'))}
 if(themePick){themePick.value=html.dataset.theme||'light';themePick.addEventListener('change',()=>theme(themePick.value))}
+// path bar: a chevron opens what lies under its step; one menu at a time; a click outside or Escape closes it,
+// arrow keys walk the links inside
+const crumbMenus=$$('.crumb-more');
+function crumbClose(except,refocus){crumbMenus.forEach(b=>{if(b===except)return;const open=b.getAttribute('aria-expanded')==='true';b.setAttribute('aria-expanded','false');document.getElementById(b.getAttribute('aria-controls')).hidden=true;if(open&&refocus)b.focus()})}
+crumbMenus.forEach(b=>{const m=document.getElementById(b.getAttribute('aria-controls'));
+ b.addEventListener('click',()=>{const open=b.getAttribute('aria-expanded')!=='true';crumbClose(b);b.setAttribute('aria-expanded',String(open));m.hidden=!open;if(open){const r=m.getBoundingClientRect();m.style.translate=r.right>innerWidth-8?`${innerWidth-8-r.right}px 0`:'';const f=m.querySelector('a');if(f&&b.matches(':focus-visible'))f.focus()}});
+ m.addEventListener('keydown',e=>{const items=[...m.querySelectorAll('a')],i=items.indexOf(document.activeElement);if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const n=items[(i+(e.key==='ArrowDown'?1:-1)+items.length)%items.length];if(n)n.focus()}})});
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('.crumb-step'))crumbClose()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('.crumb-more[aria-expanded="true"]')){crumbClose(null,true);e.stopImmediatePropagation()}});
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 if(!reduced.matches&&'IntersectionObserver'in window){document.body.classList.add('motion-ready');const observer=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');observer.unobserve(e.target)}}),{threshold:.05});$$('.reveal').forEach((el,i)=>{el.style.setProperty('--reveal-delay',(i%3)*80+'ms');observer.observe(el)})}
 // contact us: the brief is assembled here and copied or saved; nothing leaves the browser. ?project= preselects a project
@@ -45,7 +54,7 @@ if(arc)$$('.ring-item').forEach(it=>{const on=()=>{if(phone.matches&&it.closest(
 // lets the browser's back button turn it back. Without script the station is an ordinary link to /projects
 const ring=$('.ring');
 if(ring){const main=$('.ring-main'),proj=$('.ring-projects'),opener=$('[aria-controls="ring-projects"]');
- const view=(v,focus)=>{const p=v==='projects';ring.dataset.view=v;main.inert=p;proj.inert=!p;opener.setAttribute('aria-expanded',String(p));arc.classList.remove('is-lit');
+ const view=(v,focus)=>{const p=v==='projects';ring.dataset.view=v;document.body.classList.toggle('view-projects',p);main.inert=p;proj.inert=!p;opener.setAttribute('aria-expanded',String(p));arc.classList.remove('is-lit');
   if(focus)(p?proj.querySelector('a'):opener).focus({preventScroll:true})};
  opener.addEventListener('click',e=>{if(e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();e.stopImmediatePropagation();history.pushState(null,'','#projects');view('projects',e.detail===0)});
  let refocus=false;   // the back button hides itself, so focus goes to the station that opened the view
