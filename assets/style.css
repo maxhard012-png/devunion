@@ -187,6 +187,30 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .ring-item:hover,.ring-item:focus-visible,.ring-item.is-called{background:var(--glass-strong);border-color:var(--btn-fish);scale:1.05}
 .ring-item:focus-visible{outline-color:var(--btn-fish)}
 
+/* "Our projects" turns the dial over: the four sections fade back, the six projects come out on two arcs, Betting on the
+   left and Web3 on the right, each arc marked on the dial itself */
+.ring-items{transition:opacity .35s,scale .45s cubic-bezier(.2,.8,.2,1),visibility 0s}
+.ring[data-view="main"] .ring-projects,.ring[data-view="projects"] .ring-main{opacity:0;visibility:hidden;scale:.9;transition:opacity .25s,scale .35s,visibility 0s .35s}
+.ring-span{position:absolute;inset:0;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .45s;
+  background:conic-gradient(from var(--from),var(--ink2) 0deg 90deg,transparent 90deg);
+  -webkit-mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 4px) calc(100% - 1px),transparent 100%);
+  mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 4px) calc(100% - 1px),transparent 100%)}
+.ring-span-betting{--from:225deg}
+.ring-span-web3{--from:45deg}
+.ring[data-view="projects"] .ring-span{opacity:.6}
+.ring-word,.ring-hint{transition:opacity .3s}
+.ring[data-view="projects"] .ring-word,.ring[data-view="projects"] .ring-hint{opacity:0}
+.ring-sub{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s}
+.ring[data-view="projects"] .ring-sub{opacity:1;visibility:visible;transition:opacity .3s .1s}
+.ring-title{position:relative;font:300 calc(var(--D) * .075)/1 var(--display);letter-spacing:-.04em}
+.ring-back{margin-top:18px;font:500 12px/1 var(--mono);color:var(--ink2);background:var(--glass);border:1px solid var(--edge2);border-radius:999px;padding:9px 14px;cursor:pointer;pointer-events:auto;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.ring-back:hover{color:var(--ink);border-color:var(--ink3)}
+.ring-label{position:absolute;left:50%;top:50%;margin:0;transform:translate(-50%,-50%) rotate(var(--a)) translate(calc(var(--R) + 30px)) rotate(calc(var(--a) * -1));
+  font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);white-space:nowrap}
+.ring-item.is-soon{cursor:default;border-style:dashed;background:var(--wash)}
+.ring-item.is-soon:hover{scale:none;background:var(--wash);border-color:var(--edge2)}
+
 /* the round go-button, shared by the catalogue rows */
 .card-go{width:40px;height:40px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--edge2);color:var(--ink2);transition:background-color .2s,color .2s,border-color .2s}
 a.catalog-row:hover .card-go,a.catalog-row:focus-visible .card-go,.catalog-row.is-called .card-go{background:var(--btn-fish);border-color:var(--btn-fish);color:var(--water)}
