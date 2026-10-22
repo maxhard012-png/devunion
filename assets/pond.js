@@ -717,6 +717,58 @@ function render(dt) {
       blit(2, 9, Math.min(LEVELS - 1, (wakeB[i] * LEVELS) | 0), wakeB[i] > 0.45 ? 1 : 0, X, Y);
     }
   }
+  drawLogo();
+}
+// ── the </> mark in the middle of the ring: solid, with a glint of fish tiles every few seconds ──────────────────
+// The mark is the page's own SVG and stays as it is. Every 2.5–3.5 s a diagonal band, top left to bottom right, crosses it
+// in about 0.8 s: inside the band the SVG is masked away and the same shape is laid in the sharks' tiles and characters,
+// brightest at the leading edge, so the mark ripples into ASCII and back. The band's place is the gradient position
+// (x + y) / (w + h), which is exactly where a 135° CSS gradient puts it, so the mask and the tiles line up.
+const LOGO_PATH = new Path2D('M30 12 0 30l30 18v-9.5L15.5 30 30 21.5zM57 0h10L43 60H33zM70 12l30 18-30 18v-9.5L84.5 30 70 21.5z');
+const logoBox = document.querySelector('.ring-word .logo');
+const GLINT_BAND = 0.17, GLINT_TIME = 0.9;
+let logoCells = [], logoKey = '', glintAt = 1.5, glintMasked = false;
+function buildLogo() {
+  logoCells = [];
+  if (!logoBox) return;
+  const r = logoBox.getBoundingClientRect();
+  if (!r.width) return;
+  const probe = document.createElement('canvas').getContext('2d'), sx = 100 / r.width, sy = 60 / r.height;
+  for (let y = 0; y * CH < r.height; y++) for (let x = 0; x * CW < r.width; x++) {
+    // coverage from a 3×3 sample of the cell: full cells carry the stroke, partial ones its rim
+    let cov = 0;
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) if (probe.isPointInPath(LOGO_PATH, (x * CW + (i + 0.5) * CW / 3) * sx, (y * CH + (j + 0.5) * CH / 3) * sy)) cov++;
+    if (cov < 2) continue;
+    logoCells.push({ x: x * CW, y: y * CH, cov: cov / 9, t: (x * CW + CW / 2 + y * CH + CH / 2) / (r.width + r.height),
+      key: (hash(x * 131 + 7, y * 977 + 3) * 4294967295) >>> 0 });
+  }
+  logoKey = `${Math.round(r.width)}x${Math.round(r.height)}/${CW}`;
+}
+function setGlintMask(s) {
+  const m = s === null ? '' : `linear-gradient(135deg,#000 ${((s - GLINT_BAND) * 100).toFixed(2)}%,transparent ${((s - GLINT_BAND) * 100).toFixed(2)}%,transparent ${((s + GLINT_BAND) * 100).toFixed(2)}%,#000 ${((s + GLINT_BAND) * 100).toFixed(2)}%)`;
+  logoBox.style.webkitMaskImage = m; logoBox.style.maskImage = m; glintMasked = s !== null;
+}
+function drawLogo() {
+  if (!logoBox) return;
+  const p = (shimT - glintAt) / GLINT_TIME;                 // 0…1 while a glint crosses the mark
+  if (p >= 1) glintAt = shimT + 2.5 + Math.random();          // the next one in 2.5–3.5 s
+  if (p < 0 || p >= 1 || document.body.classList.contains('view-projects')) { if (glintMasked) setGlintMask(null); return; }
+  const r = logoBox.getBoundingClientRect();
+  if (`${Math.round(r.width)}x${Math.round(r.height)}/${CW}` !== logoKey) buildLogo();
+  const ease = p < 0.5 ? 2 * p * p : 1 - 2 * (1 - p) ** 2;
+  const s = -GLINT_BAND + ease * (1 + 2 * GLINT_BAND);
+  setGlintMask(s);
+  const tick = Math.floor(shimT * 12);                        // characters flicker as the band passes over them
+  for (const c of logoCells) {
+    const d = (c.t - s) / GLINT_BAND;                         // −1 at the trailing edge, +1 at the leading one
+    if (Math.abs(d) > 1.08) continue;
+    const h1 = hash(c.key % 100003, tick), h2 = hash((c.key >>> 7) % 100003, tick + 31);
+    const lead = Math.max(0, d);                              // the leading half is lit, the trailing half settles back to ink
+    let tone = Math.max(0, Math.round(4 - lead * 3.4 - (h2 > 0.6 ? 1 : 0)));
+    if (lead > 0.35 && h2 > 0.88) tone = 5;
+    const set = SHARK_BANDS[lead > 0.5 ? 2 : 3], g = set[(h1 * set.length) | 0];
+    blit(0, 0, LEVELS - 1, g === G_BARE ? set[0] : g, r.left + c.x, r.top + c.y, tone);
+  }
 }
 function frame(now) {
   raf = 0;

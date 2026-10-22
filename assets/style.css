@@ -128,7 +128,7 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .page-main{position:relative;z-index:1;width:min(var(--wrap),100%);margin:0 auto;padding:clamp(40px,8vh,96px) var(--gutter) 110px;overflow-x:clip}   /* the blur behind headings may reach past the screen edge */
 .page-heading{position:relative;max-width:760px;margin-bottom:clamp(36px,6vh,64px)}
 /* soft deep water behind every block of free-standing copy: fish passing under it blur instead of fighting the letters */
-.ring-word::before,.ring-title::before,.page-heading::before,.product-hero::before,.group-title::before,.section-title::before{content:"";position:absolute;inset:-60px -120px -50px -90px;z-index:-1;pointer-events:none;
+.ring-title::before,.page-heading::before,.product-hero::before,.group-title::before,.section-title::before{content:"";position:absolute;inset:-60px -120px -50px -90px;z-index:-1;pointer-events:none;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   -webkit-mask:radial-gradient(closest-side,#000 50%,transparent);mask:radial-gradient(closest-side,#000 50%,transparent)}
 .page-heading h1,.product-hero h1{margin-top:14px;font:300 clamp(36px,5.4vw,68px)/1.02 var(--display);letter-spacing:-.035em}
@@ -162,7 +162,7 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .ring-arc.is-lit{opacity:1}
 .ring-core{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;text-align:center;pointer-events:none}
 .ring-word{position:relative;margin:0;line-height:0;color:var(--ink)}
-.ring-word .logo{width:calc(var(--D) * .36);height:auto}   /* the </> mark in the middle of the dial */
+.ring-word .logo{width:calc(var(--D) * .42);height:auto}   /* the </> mark in the middle of the dial */
 .ring-hint{margin-top:14px;font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
 .ring-items{position:absolute;inset:0}
 .ring-item{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(var(--a)) translate(var(--R)) rotate(calc(var(--a) * -1));
@@ -341,6 +341,7 @@ textarea{resize:vertical;min-height:140px}
   .home .crumbs{order:0;width:auto}
   .crumb-home span{display:none}
   .ring{--D:min(76vw,300px)}
+  .ring-word .logo{width:calc(var(--D) * .56)}   /* on the phone grid a smaller mark has strokes only two tiles wide */
   .ring-item{transform:translate(-50%,-50%) rotate(var(--am)) translate(var(--R)) rotate(calc(var(--am) * -1));padding:8px 12px 8px 10px;gap:8px}
   .ring-text small{display:none}
   .ring-text b{font-size:14px}
