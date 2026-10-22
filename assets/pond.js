@@ -26,8 +26,6 @@ const PAL = [
   [110, 140, 180],  // 7 sardine silver-blue
   [140, 150, 146],  // 8 small grey fish
   [124, 124, 122],  // 9 water: dust, wakes, ripples (neutral grey: the page has no tint)
-  [128, 124, 116],  // 10 pebbles on the bottom: warm stone grey
-  [92, 132, 76],    // 11 hornwort: a deep pond green
 ];
 const GUIDE_DOT = { hammer: 0, mako: 1, nurse: 2, koi: 3, koi3: 4, koi2: 6, school: 7 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
@@ -50,6 +48,9 @@ const LOOK = PAL.map(c => {
 // glyphs: 0–8 tone ramp, 9 eye, 10–13 fin rays by direction, 14 dot, 15 wave, 16+ extra scale characters
 const GLYPHS = '.:-=+*%#@o-\\|/.~,;\'tSxX8& ';     // the last, a space, is a bare tile
 // scale characters by tone, light skin to deep shadow, as in the reference: a cell picks one by its place on the body
+// sharks draw from their own sets, closer to the reference: a pale rim of bare squares and dots, then S X % t, and
+// 8 @ # along the spine (a space is a bare square)
+const SHARK_BANDS = [':.  ', ': S ', 'SXt%', '8@#%'].map(set => [...set].map(ch => GLYPHS.indexOf(ch)));
 const BANDS = ['.,:\'', ':;-=', '=+tx', '%Sx*', 'X8#%', '8#@&'].map(set => [...set].map(ch => GLYPHS.indexOf(ch)));
 const NG = GLYPHS.length, RAMP_N = 9, G_EYE = 9, G_RAY = 10, G_WAVE = 15, G_BARE = NG - 1;
 const LEVELS = 8, NC = PAL.length, NT = 3;         // sprite types: 0 body, 1 lit body, 2 glyph only (fins, water dots)
@@ -77,7 +78,7 @@ function resize() {
   wakeB = new Float32Array(n);
   showV = new Float32Array(n); showC = new Uint8Array(n); showG = new Uint8Array(n); showO = new Int16Array(n);
   showK = new Uint32Array(n); keyB = new Uint32Array(n); bandB = new Uint8Array(n);
-  buildAtlas(); buildWaves(); buildBed();
+  buildAtlas(); buildWaves();
   fish.forEach(f => f.rescale && f.rescale());
 }
 // Sprite layout: one atlas canvas per sprite type, so none grows past what the GPU keeps as a texture (one shared
@@ -107,6 +108,21 @@ function paint(type, key) {
     // On night water the colours are pushed richer (the muted daylight skins read as grey on a dark page), the band runs
     // from that rich hue down a step, and every glyph is light, so the fish glow out of the dark
     const nh = night ? vivid(hue, 1.7) : hue;
+    if (c <= 2) {
+      // sharks (palette 0–2) are drawn in neutral greys, as in the reference: tone 0 a pale rim square, tone 4 a near-black
+      // spine square, with the glyph inverting against it; tone 5 a rare muted accent. On night water the ramp turns over,
+      // so the spine is the brightest part. A called shark takes a wash of its own colour, so the fish answering the
+      // pointer still shows which section it belongs to
+      const pale = night ? [64, 64, 64] : [196, 196, 194], deep = night ? [218, 218, 216] : [44, 44, 46];
+      let sq = vr === 5 ? mix(L.accent, [150, 150, 150], 0.3) : mix(pale, deep, vr / 4);
+      if (type) sq = mix(sq, vivid(hue, 1.4), 0.32);
+      const inv = night ? vr <= 1 : vr >= 3 || vr === 5;
+      actx.fillStyle = rgba(sq, 0.5 + 0.48 * v);
+      actx.fillRect(x + inset * 0.5, y + inset * 0.5, sw - inset, sh - inset);
+      actx.fillStyle = inv ? rgba(mix(sq, WHITE, 0.85), 0.6 + 0.4 * v) : rgba(mix(sq, BLACK, 0.78), 0.5 + 0.5 * v);
+      actx.fillText(GLYPHS[g], x + sw / 2, y + sh / 2 + dpr * 0.5);
+      atlases[type].painted[key] = 1; return;
+    }
     const tile = night ? (vr === 5 ? mix(vivid(L.accent, 1.2), nh, 0.25) : mix(nh, mix(nh, BLACK, 0.4), vr / 4))
       : vr === 5 ? mix(L.accent, hue, 0.45) : mix(mix(hue, WHITE, 0.28), mix(hue, BLACK, 0.34), vr / 4), dark = night || vr === 4;
     actx.fillStyle = rgba(tile, night ? 0.38 + 0.6 * v : 0.3 + 0.62 * v);
@@ -114,9 +130,7 @@ function paint(type, key) {
     actx.fillStyle = dark ? rgba(mix(nh, WHITE, 0.8), 0.55 + 0.45 * v) : rgba(mix(hue, BLACK, 0.72), 0.45 + 0.55 * v);
     actx.fillText(GLYPHS[g], x + sw / 2, y + sh / 2 + dpr * 0.5);
   } else {
-    // hornwort (11) keeps its green instead of the deep ink used for fins, or it reads as grey twigs
-    const ink = c === 11 ? (night ? mix(L.base, WHITE, 0.2) : mix(L.base, BLACK, 0.18))
-      : night ? (c === 9 ? mix(L.base, WHITE, 0.15) : mix(L.base, WHITE, 0.3)) : c === 9 ? L.base : L.ink;
+    const ink = night ? (c === 9 ? mix(L.base, WHITE, 0.15) : mix(L.base, WHITE, 0.3)) : c === 9 ? L.base : L.ink;
     actx.fillStyle = c === 9 ? rgba(ink, (night ? 0.1 : 0.14) + 0.56 * v) : rgba(ink, 0.3 + 0.7 * v);
     actx.fillText(GLYPHS[g], x + sw / 2, y + sh / 2);
   }
@@ -562,7 +576,8 @@ class Fish {
         const fx1 = a.x + ox + a.fx * tip * 0.5, fy1 = a.y + oy + a.fy * tip * 0.5, bx1 = a.x + ox - a.fx * tip * 0.5, by1 = a.y + oy - a.fy * tip * 0.5;
         stampTri(fx0, fy0, fx1, fy1, bx1, by1, 0.86 * b, p.col);
         stampTri(fx0, fy0, bx1, by1, bx0, by0, 0.86 * b, p.col);
-        stamp(a.x + ox, a.y + oy, 1, 5, 1);
+        // a pair of eye marks at each tip, "oo", as on the reference hammerheads
+        for (const e of [0, 1]) stamp(a.x + ox - a.nx * CW * 1.1 * e * s, a.y + oy - a.ny * CW * 1.1 * e * s, 1, 5, 1);
       }
     } else {
       const a = this.at(0.075), w = a.w * 0.82;
@@ -655,7 +670,7 @@ addEventListener('pointermove', e => { pointer.x = e.clientX; pointer.y = e.clie
 document.addEventListener('pointerleave', () => pointer.on = false);
 // other scripts on the page can disturb the water (the fork example on the home page does when a fork appears)
 addEventListener('pond:ripple', e => { ripples.push({ x: e.detail.x, y: e.detail.y, r: 0, max: 150, speed: 110 }); wake(); });
-const retheme = () => { readTheme(); tintButtons(); buildAtlas(); buildBed(); bedAt = -1; wake(); };
+const retheme = () => { readTheme(); tintButtons(); buildAtlas(); wake(); };
 addEventListener('pond:theme', retheme);
 darkMQ.addEventListener('change', retheme);
 // a tap in open water: a ripple, and every fish near it bolts
@@ -714,88 +729,6 @@ function drawGlow() {
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, rgba(c, k)); g.addColorStop(0.5, rgba(c, k * 0.4)); g.addColorStop(1, rgba(c, 0));
       ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    }
-  }
-}
-// ── the bottom of the pond, only at its edges ───────────────────────────
-// A few clusters of pebbles and some hornwort, as in a real koi pond seen from above. Everything here lies under the
-// water: it is drawn first, so the current's marks and the fish pass over it; the pebbles are dim, slightly soft
-// squares, the plants thin glyph-only strokes. Only the edges get any, clear of the ring and the corner controls, and
-// a phone gets less. Positions are fixed per screen size (a seeded layout), so the bottom does not jump on reload.
-let bed = null;                      // the pebbles, painted once per size and theme into their own canvas
-const plants = [];
-function seeded(n) { let s = n >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
-function buildBed() {
-  const rnd = seeded(W * 31 + H), small = W < 640;
-  // pebble clusters: left edge low, right edge high, bottom edge left of centre; the phone keeps the first two
-  const spots = [[0.015, 0.74, 5], [0.985, 0.2, 4], [0.4, 1.0, 6]].slice(0, small ? 2 : 3);
-  const tile = document.createElement('canvas'); tile.width = canvas.width; tile.height = canvas.height;
-  const t = tile.getContext('2d'); t.setTransform(dpr, 0, 0, dpr, 0, 0);
-  for (const [fx, fy, count] of spots) {
-    const cx0 = fx * W, cy0 = fy * H, spread = (small ? 70 : 120) * scale / 1.9;
-    for (let n = 0; n < count; n++) {
-      const a = rnd() * TAU, r = Math.sqrt(rnd()) * spread;
-      const px = cx0 + Math.cos(a) * r, py = cy0 + Math.sin(a) * r * 0.8;
-      const rx = (17 + rnd() * 19) * scale / 1.9, ry = rx * (0.6 + rnd() * 0.3), rot = rnd() * Math.PI, tone = rnd();
-      const ca = Math.cos(rot), sa = Math.sin(rot);
-      for (let y = Math.floor((py - rx) / CH); y <= (py + rx) / CH; y++) for (let x = Math.floor((px - rx) / CW); x <= (px + rx) / CW; x++) {
-        const dx = (x + 0.5) * CW - px, dy = (y + 0.5) * CH - py;
-        const u = (dx * ca + dy * sa) / rx, v = (-dx * sa + dy * ca) / ry, d = u * u + v * v;
-        if (d > 1) continue;
-        // lit from the top left, as the water lights it; darker toward the lower right rim
-        const lit = clamp(0.55 - 0.35 * (dx / rx + dy / ry) * 0.5 - 0.25 * d, 0, 1);
-        const shade = Math.min(4, Math.max(0, Math.round((1 - lit) * 4.2 + tone * 0.6 - 0.4)));
-        // the rim is a darker bare square: it outlines each stone, so a cluster reads as separate pebbles, not one blob
-        const rim = d > 0.72, g = rim ? G_BARE : Math.min(RAMP_N - 1, Math.round((1 - lit) * 6) + 1);
-        blit(0, 10, rim ? 2 : 3, g, x * CW, y * CH, rim ? 4 : shade, t);
-      }
-    }
-  }
-  // soften the whole bed a little, as water does; where canvas filters are missing it simply stays sharp
-  bed = document.createElement('canvas'); bed.width = canvas.width; bed.height = canvas.height;
-  const b = bed.getContext('2d');
-  b.filter = 'blur(0.6px)'; b.globalAlpha = night ? 0.7 : 0.62; b.drawImage(tile, 0, 0);
-  // hornwort: a tuft of fronds rising from the edge beside each cluster, leaning inward
-  plants.length = 0;
-  const roots = [[0, 0.62, -0.15], [1, 0.3, Math.PI + 0.15], [0.47, 1, -Math.PI / 2], [0.9, 1, -Math.PI / 2 - 0.35]].slice(0, small ? 2 : 4);
-  for (const [fx, fy, dir] of roots) {
-    const fronds = small ? 4 : 6 + ((rnd() * 3) | 0);
-    for (let k = 0; k < fronds; k++) plants.push({ x: fx * W, y: fy * H, a: dir + (rnd() - 0.5) * 1.3,
-      len: (small ? 60 : 70 + rnd() * 80) * scale / 1.9, bend: (rnd() - 0.5) * 0.9, ph: rnd() * TAU, rate: 0.5 + rnd() * 0.3 });
-  }
-  bedAt = -1;      // recompose the bottom layer on the next frame
-}
-// The bottom changes slowly (fronds sway over seconds), so it is composed into one layer about 15 times a second and
-// the frames in between just copy that layer: some 1 400 glyph copies a frame became one
-let bedLayer = null, bedAt = -1;
-function drawBed() {
-  if (!bedLayer || bedLayer.width !== canvas.width || bedLayer.height !== canvas.height) {
-    bedLayer = document.createElement('canvas'); bedLayer.width = canvas.width; bedLayer.height = canvas.height; bedAt = -1;
-  }
-  if (bedAt < 0 || Math.abs(flowT - bedAt) >= 1 / 15) { bedAt = flowT; composeBed(); }
-  ctx.drawImage(bedLayer, 0, 0, W, H);
-}
-function composeBed() {
-  const out = bedLayer.getContext('2d');
-  out.setTransform(1, 0, 0, 1, 0, 0); out.clearRect(0, 0, bedLayer.width, bedLayer.height); out.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (bed) out.drawImage(bed, 0, 0, W, H);
-  const step = CH * 0.9;
-  for (const p of plants) {
-    // the frond sways on its own slow beat and leans with the current it stands in
-    const [u, v] = flow(p.x, p.y), drift = Math.atan2(v, u);
-    let a = p.a, x = p.x, y = p.y;
-    const n = Math.max(4, Math.round(p.len / step));
-    for (let i = 0; i < n; i++) {
-      const s = i / n;
-      a += (p.bend + 0.5 * Math.sin(flowT * p.rate + p.ph + s * 2)) / n + Math.sin(drift - a) * 0.02 * s;
-      x += Math.cos(a) * step; y += Math.sin(a) * step;
-      const lv = Math.max(1, Math.round((night ? 4 : 3) * (1 - s * 0.6)));
-      blit(2, 11, lv, G_RAY + rayCode(Math.cos(a), Math.sin(a)) - 2, x - CW / 2, y - CH / 2, 0, out);
-      // whorls of needles on both sides, swept toward the tip and shorter near it: the soft bottle-brush of hornwort
-      if (i > 0) for (const side of [-1, 1]) {
-        const la = a + side * (0.8 + 0.25 * Math.sin(i + p.ph)), ll = CW * (1.5 - s * 0.8);
-        blit(2, 11, Math.max(1, lv - 1), G_RAY + rayCode(Math.cos(la), Math.sin(la)) - 2, x + Math.cos(la) * ll - CW / 2, y + Math.sin(la) * ll - CH / 2, 0, out);
-      }
     }
   }
 }
@@ -888,7 +821,6 @@ function render(dt) {
   for (const f of foam) stampWake(f.x, f.y, f.k * f.life / f.max);
   ctx.clearRect(0, 0, W, H);
   ctx.font = `600 ${Math.round(CH * 1.02)}px 'JetBrains Mono', ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  drawBed();
   drawWaves(dt);
   drawGlow();
   const rise = dt > 0 ? 1 - Math.exp(-dt * 20) : 1, fall = dt > 0 ? Math.exp(-dt * 11) : 0;
@@ -911,9 +843,11 @@ function render(dt) {
         // the tone band (0–3) follows the cell's brightness with hysteresis: it moves only once the brightness is well past
         // the band's edge, so a fish sliding over a cell does not tip its character back and forth at every threshold
         const bt = v * 4; let bd = bandB[i]; if (Math.abs(bt - bd - 0.5) > 0.85) bandB[i] = bd = Math.min(3, bt | 0);
-        const k = showK[i], tick = Math.floor(shimT * 0.17 + (k % 997) / 97), set = BANDS[[1, 2, 3, 5][bd]];
+        const grey = c <= 2;                // the sharks: the full ramp, rim to spine, and their own characters
+        const k = showK[i], tick = Math.floor(shimT * 0.17 + (k % 997) / 97), set = grey ? SHARK_BANDS[bd] : BANDS[[1, 2, 3, 5][bd]];
         const h1 = hash(k % 100003, tick), h2 = hash((k >>> 7) % 100003, tick + 31);
-        const tone = h2 > 0.975 ? 5 : Math.max(0, Math.min(4, Math.round(0.9 + bd * 0.55 + (h2 - 0.5) * 1.6)));
+        const tone = h2 > 0.975 ? 5 : grey ? Math.max(0, Math.min(4, Math.round(bd * 1.3 + (h2 - 0.5) * 1.2)))
+          : Math.max(0, Math.min(4, Math.round(0.9 + bd * 0.55 + (h2 - 0.5) * 1.6)));
         const GL = bd === 0 && h1 > 0.8 ? G_BARE : set[(h1 * set.length) | 0];
         blit(hot, c, lv, GL, X, Y, tone);
       } else {
@@ -969,7 +903,7 @@ addEventListener('resize', () => {
   wake();
 });
 // glyphs painted before the web font arrived would stay in the fallback face forever: repaint the atlas once it lands
-if (document.fonts) document.fonts.ready.then(() => { buildAtlas(); buildBed(); wake(); });
+if (document.fonts) document.fonts.ready.then(() => { buildAtlas(); wake(); });
 
 resize(); populate();
 // settle the pond before the first visible frame, so fish are mid-swim, not spawning
