@@ -5,12 +5,12 @@
 @font-face{font-family:'Onest';font-style:normal;font-weight:100 900;font-display:swap;src:url('fonts/onest-cyrillic.woff2') format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
 
 :root{
-  /* pale pond water, sunlit at the top and a shade deeper below; every text colour here clears WCAG AA (≥4.5:1) on
+  /* neutral off-white water (no blue or green tint, client 2026-10-22), lighter at the top and a shade deeper below; every text colour here clears WCAG AA (≥4.5:1) on
      --water-deep, the darker end, and on glass */
-  --water:#e6f0ed; --water-deep:#d6e6e3; --haze:rgba(255,255,255,.45);
+  --water:#f3f3f1; --water-deep:#e7e7e4; --haze:rgba(255,255,255,.45);
   --ink:#15171a; --ink2:#4d5258; --ink3:#5b6066;
   --glass:rgba(255,255,255,.6); --glass-strong:rgba(255,255,255,.88); --edge:rgba(18,20,24,.1); --edge2:rgba(18,20,24,.2);
-  --wash:rgba(18,20,24,.045); --sunk:rgba(255,255,255,.75); --veil:rgba(230,240,237,.96); --scrim:rgba(20,22,26,.22);
+  --wash:rgba(18,20,24,.045); --sunk:rgba(255,255,255,.75); --veil:rgba(243,243,241,.96); --scrim:rgba(20,22,26,.22);
   --danger:#c02f22;
   --display:'Onest',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
   --gutter:clamp(16px,4vw,48px); --wrap:1180px; --r:12px;
@@ -19,19 +19,19 @@
 /* night water: the same tokens, deep and dark; text clears WCAG AA on --water and on glass. Chosen with the theme switch
    ("dark"), or followed from the system ("system"); light is the default */
 :root[data-theme="dark"]{
-  --water:#0f2129; --water-deep:#0a161d; --haze:rgba(60,150,170,.12);
+  --water:#171717; --water-deep:#0f0f0f; --haze:rgba(255,255,255,.04);
   --ink:#e8eeec; --ink2:#b3bdbb; --ink3:#9aa5a3;
-  --glass:rgba(20,40,48,.6); --glass-strong:rgba(22,44,53,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
-  --wash:rgba(255,255,255,.05); --sunk:rgba(0,0,0,.28); --veil:rgba(15,33,41,.96); --scrim:rgba(0,0,0,.5);
+  --glass:rgba(32,32,32,.62); --glass-strong:rgba(36,36,36,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
+  --wash:rgba(255,255,255,.05); --sunk:rgba(0,0,0,.28); --veil:rgba(23,23,23,.96); --scrim:rgba(0,0,0,.5);
   --danger:#ff8a7c;
   color-scheme:dark;
 }
 @media (prefers-color-scheme:dark){
   :root[data-theme="system"]{
-    --water:#0f2129; --water-deep:#0a161d; --haze:rgba(60,150,170,.12);
+    --water:#171717; --water-deep:#0f0f0f; --haze:rgba(255,255,255,.04);
     --ink:#e8eeec; --ink2:#b3bdbb; --ink3:#9aa5a3;
-    --glass:rgba(20,40,48,.6); --glass-strong:rgba(22,44,53,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
-    --wash:rgba(255,255,255,.05); --sunk:rgba(0,0,0,.28); --veil:rgba(15,33,41,.96); --scrim:rgba(0,0,0,.5);
+    --glass:rgba(32,32,32,.62); --glass-strong:rgba(36,36,36,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
+    --wash:rgba(255,255,255,.05); --sunk:rgba(0,0,0,.28); --veil:rgba(23,23,23,.96); --scrim:rgba(0,0,0,.5);
     --danger:#ff8a7c;
     color-scheme:dark;
   }
@@ -82,9 +82,17 @@ h1,h2,p{margin:0}
 
 /* ── shared pieces ──────────────────────────────────────────────────── */
 .eyebrow{font:500 11px/1.3 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--fish)}
+/* a page's place, written as a shell path; the path segments are links, the current one is in the page's colour */
+.prompt{position:relative;z-index:1;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 .4em;font:500 13px/1.4 var(--mono);color:var(--ink3)}
+.prompt a{color:var(--ink2);text-decoration:none;border-bottom:1px solid transparent}
+.prompt a:hover{color:var(--ink);border-bottom-color:var(--edge2)}
+.prompt [aria-current]{color:var(--fish)}
+.prompt-sign{color:var(--fish)}
+.caret{display:inline-block;width:.55em;height:1.05em;margin-left:.1em;background:var(--fish);vertical-align:-.15em;animation:caret 1.1s steps(1) infinite}
+@keyframes caret{50%{opacity:0}}
 /* Chinese and Korean have no capitals and read badly tracked out */
 :lang(zh) :is(.eyebrow,.ring-label,.ring-hint,.fd-head),:lang(ko) :is(.eyebrow,.ring-label,.ring-hint,.fd-head){letter-spacing:.02em}
-.button{display:inline-flex;align-items:center;gap:8px;font:600 15px/1 var(--display);color:var(--water);background:var(--fish);border:0;border-radius:10px;padding:14px 18px;text-decoration:none;cursor:pointer;transition:filter .2s,transform .2s}
+.button{display:inline-flex;align-items:center;gap:8px;font:600 13.5px/1 var(--mono);letter-spacing:.01em;color:var(--water);background:var(--fish);border:0;border-radius:10px;padding:14px 18px;text-decoration:none;cursor:pointer;transition:filter .2s,transform .2s}
 .button:hover{filter:brightness(1.12);transform:translateY(-1px)}
 .reset,.small-link{font:500 13px/1 var(--mono);color:var(--ink2);background:none;border:0;padding:14px 4px;cursor:pointer;text-decoration:none}
 .reset:hover,.small-link:hover{color:var(--ink)}
@@ -136,6 +144,11 @@ h1,h2,p{margin:0}
   background:var(--glass);border:1px solid var(--edge);border-radius:14px;-webkit-backdrop-filter:blur(12px) saturate(1.2);backdrop-filter:blur(12px) saturate(1.2);
   transition:background-color .2s,border-color .2s,scale .25s cubic-bezier(.2,.8,.2,1)}
 .ring-item .card-swatch{margin-right:16px}
+/* the station's number key; on touch screens there is no keyboard to press it with */
+.ring-key{display:grid;place-items:center;min-width:19px;height:19px;margin-left:4px;padding:0 4px;font:500 10.5px/1 var(--mono);color:var(--ink3);border:1px solid var(--edge2);border-radius:4px}
+.ring-key:empty{display:none}
+.ring-item:hover .ring-key,.ring-item:focus-visible .ring-key{color:var(--btn-fish);border-color:var(--btn-fish)}
+@media (hover:none){.ring-key{display:none}}
 .ring-text{display:flex;flex-direction:column;gap:2px;text-align:left}
 .ring-text b{font:500 16px/1.15 var(--display);letter-spacing:-.015em}
 .ring-text small{font:500 11px/1.2 var(--mono);color:var(--ink2)}
@@ -326,7 +339,7 @@ textarea{resize:vertical;min-height:140px}
   .catalog-row .card-go{grid-column:3;grid-row:1/3}
 }
 @media (prefers-reduced-motion:reduce){
-  .ring-main .ring-item{animation:none}
+  .ring-main .ring-item,.caret{animation:none}
   .ring-item,.ring-items,.ring-arc,.ring-span,.ring-sub,.ring-word,.ring-hint,.card-go,.catalog-row,.button{transition:none}
   .ring-item:hover,.button:hover{transform:none}
 }

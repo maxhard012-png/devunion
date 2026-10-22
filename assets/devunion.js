@@ -52,6 +52,12 @@ if(ring){const main=$('.ring-main'),proj=$('.ring-projects'),opener=$('[aria-con
  $('.ring-back').addEventListener('click',()=>{if(location.hash==='#projects'){refocus=true;history.back()}else view('main',true)});
  addEventListener('popstate',()=>{view(location.hash==='#projects'?'projects':'main',refocus);refocus=false});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ring.dataset.view==='projects')$('.ring-back').click()});
- view(location.hash==='#projects'?'projects':'main',false)}
+ view(location.hash==='#projects'?'projects':'main',false);
+ // number keys, as in a terminal menu: 1–4 pick a section, 1–5 a project on the turned dial; each station shows its key
+ const keyed=nav=>[...nav.querySelectorAll('a.ring-item')];
+ for(const nav of [main,proj])keyed(nav).forEach((a,i)=>{const k=a.querySelector('.ring-key');if(k)k.textContent=i+1});
+ document.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey||e.target.closest('input,textarea,select,[contenteditable]'))return;
+  const n=+e.key;if(!(n>=1&&n<=9))return;const a=keyed(ring.dataset.view==='projects'?proj:main)[n-1];if(!a)return;
+  e.preventDefault();a.focus({preventScroll:true});a.click()})}
 language(lang);
 })();

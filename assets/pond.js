@@ -25,7 +25,7 @@ const PAL = [
   [206, 52, 44],    // 6 kohaku red
   [110, 140, 180],  // 7 sardine silver-blue
   [140, 150, 146],  // 8 small grey fish
-  [120, 128, 130],  // 9 water: dust, wakes, ripples
+  [124, 124, 122],  // 9 water: dust, wakes, ripples (neutral grey: the page has no tint)
 ];
 const GUIDE_DOT = { hammer: 0, mako: 1, nurse: 2, koi: 3, koi3: 4, koi2: 6, school: 7 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
