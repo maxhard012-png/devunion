@@ -726,41 +726,69 @@ function flow(x, y) {
   return [7 + EDDY / 300 * Math.sin(s1) * Math.cos(c1) + BAND / 420 * cq,
     2 - EDDY / 260 * Math.cos(s1) * Math.sin(c1) - 0.6 * BAND / 420 * cq];
 }
-// Marks on the water: short, translucent streaks drawn along their own path, so each one shows which way the water is
-// going: its characters turn with the current (− \ | /), a "~" at the leading end, a dot where it trails off. Each fades in,
-// rides the current for 6–12 s and fades out, then starts again elsewhere. About one per 30 000 px², capped.
+// Fish move water: near a fish the current is pulled along its heading, strongest close to the body and fading out at
+// about half a body length, so marks bend around a passing fish and are dragged into its wake.
+function waterAt(x, y) {
+  let [u, v] = flow(x, y);
+  for (const f of fish) {
+    if (!f.L || f.away) continue;
+    const R = f.L * 0.5 + 40, d = Math.hypot(x - f.x, y - f.y);
+    if (d >= R) continue;
+    const k = (1 - d / R) ** 2 * 0.55 * f.v;
+    u += Math.cos(f.a) * k; v += Math.sin(f.a) * k;
+  }
+  return [u, v];
+}
+// Marks on the water, on two layers. Surface streaks are strokes whose characters turn with the current (− \ | /),
+// led by a "~"; deep ones ride the same current at half speed, dimmer, as a dotted line (. , :), so the water has depth.
+// A crest of brightness runs along every stroke from tail to head, so a streak rolls instead of just sliding.
+// Characters sit at fixed distances behind the moving head along its own path, so they glide continuously rather than
+// stepping cell by cell. Each fades in, rides 6–12 s, fades out and starts again elsewhere. About one per 26 000 px².
 const streaks = [];
+const DEEP = [0, 16, 1];                    // . , :
 function seedStreak(s, fresh) {
+  s.deep = Math.random() < 0.4;
   s.x = Math.random() * W; s.y = Math.random() * H; s.trail = [[s.x, s.y]];
-  s.len = 4 + ((Math.random() * 5) | 0); s.life = 6 + Math.random() * 6; s.age = fresh ? Math.random() * s.life : 0;
-  s.peak = 0.45 + Math.random() * 0.3;
+  s.len = s.deep ? 3 + ((Math.random() * 4) | 0) : 4 + ((Math.random() * 5) | 0);
+  s.life = 6 + Math.random() * 6; s.age = fresh ? Math.random() * s.life : 0;
+  s.peak = s.deep ? 0.5 + Math.random() * 0.2 : 0.65 + Math.random() * 0.3;
+  s.crest = Math.random() * TAU;
   return s;
 }
 function buildWaves() {
-  const n = Math.min(60, Math.round(W * H / 30000));
+  const n = Math.min(70, Math.round(W * H / 26000));
   streaks.length = 0;
   for (let i = 0; i < n; i++) streaks.push(seedStreak({}, true));
 }
 function drawWaves(dt) {
   flowT += dt;
   for (const s of streaks) {
-    s.age += dt;
+    s.age += dt; s.crest += dt * 3.2;
+    const sp = s.deep ? 0.5 : 1;
     // midpoint step: follows the curve of an eddy instead of cutting across it
-    const [u0, v0] = flow(s.x, s.y), [u1, v1] = flow(s.x + u0 * dt / 2, s.y + v0 * dt / 2);
-    s.x += u1 * dt; s.y += v1 * dt;
-    const last = s.trail[0];
-    if (Math.hypot(s.x - last[0], s.y - last[1]) >= CW) { s.trail.unshift([s.x, s.y]); if (s.trail.length > s.len) s.trail.pop(); }
-    if (s.age >= s.life || s.x < -40 || s.x > W + 40 || s.y < -40 || s.y > H + 40) seedStreak(s, false);
+    const [u0, v0] = waterAt(s.x, s.y), [u1, v1] = waterAt(s.x + u0 * sp * dt / 2, s.y + v0 * sp * dt / 2);
+    s.x += u1 * sp * dt; s.y += v1 * sp * dt;
+    const T = s.trail, last = T[0];
+    if (Math.hypot(s.x - last[0], s.y - last[1]) >= 2) { T.unshift([s.x, s.y]); if (T.length > s.len * CW) T.pop(); }
+    if (s.age >= s.life || s.x < -40 || s.x > W + 40 || s.y < -40 || s.y > H + 40) { seedStreak(s, false); continue; }
     const a = Math.sin(Math.PI * Math.min(1, s.age / s.life)) * s.peak;    // swells in, fades out
     if (a < 0.03) continue;
-    const T = s.trail, n = T.length;
-    for (let k = 0; k < n; k++) {
-      // the leading end is the brightest; the stroke thins toward its tail
-      const fade = a * (1 - 0.6 * k / Math.max(1, n - 1)), lv = Math.min(LEVELS - 1, (fade * LEVELS) | 0);
-      if (lv < 1) continue;
-      const p = T[k], q = T[Math.min(n - 1, k + 1)], r = T[Math.max(0, k - 1)];
-      const glyph = k === 0 ? G_WAVE : k === n - 1 ? 14 : G_RAY + rayCode(r[0] - q[0], r[1] - q[1]) - 2;
-      blit(2, 9, lv, glyph, p[0] - CW / 2, p[1] - CH / 2);
+    // walk back along the path from the live head, dropping a character every CW px of arc length
+    let k = 0, want = 0, acc = 0, px = s.x, py = s.y;
+    for (let j = 0; j <= T.length && k < s.len; j++) {
+      const qx = j < T.length ? T[j][0] : px, qy = j < T.length ? T[j][1] : py, seg = Math.hypot(qx - px, qy - py);
+      while (k < s.len && acc + seg >= want) {
+        const t = seg ? (want - acc) / seg : 0, x = px + (qx - px) * t, y = py + (qy - py) * t;
+        const crest = 0.72 + 0.28 * Math.sin(s.crest - k * 0.9);
+        const fade = a * (1 - 0.55 * k / Math.max(1, s.len - 1)) * crest, lv = Math.min(LEVELS - 1, (fade * LEVELS) | 0);
+        if (lv >= 1) {
+          const glyph = s.deep ? DEEP[k % 3] : k === 0 ? G_WAVE : G_RAY + rayCode(px - qx || 1e-3, py - qy) - 2;
+          blit(2, 9, lv, glyph, x - CW / 2, y - CH / 2);
+        }
+        k++; want = k * CW;
+      }
+      acc += seg; px = qx; py = qy;
+      if (j === T.length) break;
     }
   }
 }
@@ -861,5 +889,5 @@ resize(); populate();
 // settle the pond before the first visible frame, so fish are mid-swim, not spawning
 for (let i = 0; i < 120; i++) simulate(1 / 60, i * 16.7);
 wake();
-window.__pond = { fish, guides };
+window.__pond = { fish, guides, streaks };
 })();
