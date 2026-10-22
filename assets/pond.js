@@ -534,9 +534,7 @@ class Fish {
       const a0 = this.at(0.32), a1 = this.at(0.6);
       stampLine(a0.x, a0.y, a1.x + a1.nx * Math.sin(this.phase) * 2, a1.y + a1.ny * Math.sin(this.phase) * 2, 0.75 * b, p.koi[0]);
     }
-    { // eyes and barbels
-      const a = this.at(0.07), ew = a.w * 0.72;
-      for (const s of [-1, 1]) stamp(a.x + a.nx * ew * s, a.y + a.ny * ew * s, 1, 5, 1);
+    { // barbels (no eye marks: the client found them odd, 2026-10-22)
       const h = this.at(0.01), bl = L * 0.07;
       for (const s of [-1, 1]) stampLine(h.x + h.nx * h.w * 0.6 * s, h.y + h.ny * h.w * 0.6 * s, h.x + h.fx * bl * 0.3 + h.nx * bl * s, h.y + h.fy * bl * 0.3 + h.ny * bl * s, 0.55 * b, p.koi[1]);
     }
@@ -575,12 +573,7 @@ class Fish {
         const fx1 = a.x + ox + a.fx * tip * 0.5, fy1 = a.y + oy + a.fy * tip * 0.5, bx1 = a.x + ox - a.fx * tip * 0.5, by1 = a.y + oy - a.fy * tip * 0.5;
         stampTri(fx0, fy0, fx1, fy1, bx1, by1, 0.86 * b, p.col);
         stampTri(fx0, fy0, bx1, by1, bx0, by0, 0.86 * b, p.col);
-        // a pair of eye marks at each tip, "oo", as on the reference hammerheads
-        for (const e of [0, 1]) stamp(a.x + ox - a.nx * CW * 1.1 * e * s, a.y + oy - a.ny * CW * 1.1 * e * s, 1, 5, 1);
       }
-    } else {
-      const a = this.at(0.075), w = a.w * 0.82;
-      for (const s of [-1, 1]) stamp(a.x + a.nx * w * s, a.y + a.ny * w * s, 1, 5, 1);
     }
   }
 }
