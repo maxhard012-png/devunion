@@ -54,10 +54,9 @@ h1,h2,p{margin:0}
 ::selection{background:var(--fish);color:var(--water)}
 :focus-visible{outline:2px solid var(--fish);outline-offset:3px}
 
-#pond{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
-#pond{transition:opacity 1.4s ease}
-#pond:not(.is-ready){opacity:0}       /* the pond fades in once the first frame is drawn, instead of popping */
-.page #pond{opacity:.85}               /* inner pages: the pond is a backdrop, a step behind the content */
+#pond,#pond-under{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;transition:opacity 1.4s ease}
+#pond:not(.is-ready),#pond-under:not(.is-ready){opacity:0}       /* the pond fades in once the first frame is drawn, instead of popping */
+.page #pond,.page #pond-under{opacity:.85}               /* inner pages: the pond is a backdrop, a step behind the content */
 
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 /* stops the pond on every page; the glyph says what a press will do */

@@ -8,6 +8,13 @@ const $$ = s => [...document.querySelectorAll(s)];
 const canvas = document.getElementById('pond');
 if (!canvas) return;
 const ctx = canvas.getContext('2d');
+// The grid canvas redraws only the cells whose sprite changed since the last frame (dirty cells), so it is never cleared
+// as a whole. What changes over wide areas every frame (the light pools under a called fish, the logo's glint) is drawn
+// on a second canvas beneath it, cleared each frame. On a 1440×900 retina screen this took the frame from ~18 000 sprite
+// copies to the few hundred that moved, which is what made heavy moments stutter
+const under = document.createElement('canvas');
+under.id = 'pond-under'; under.setAttribute('aria-hidden', 'true'); canvas.before(under);
+const uctx = under.getContext('2d');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -61,13 +68,13 @@ const SPR_COLS = 128;
 let W = 0, H = 0, dpr = 1, CW = 6, CH = 7, cols = 0, rows = 0, scale = 1;
 let val, col, own, dep, gly, wakeB;
 // what is on screen, per cell: it chases this frame's stamp and fades out after the fish has left (phosphor persistence)
-let showV, showC, showG, showO, showK, keyB, bandB;
+let showV, showC, showG, showO, showK, keyB, bandB, drawn, edgeX, edgeY;
 let shimT = 0;                                     // scale-shimmer clock: stops with the pause, slows with reduced motion
 let atlases = [], sw = 0, sh = 0;
 function resize() {
   W = innerWidth; H = innerHeight; dpr = Math.min(devicePixelRatio || 1, 2);
-  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvas.width = under.width = Math.round(W * dpr); canvas.height = under.height = Math.round(H * dpr);
+  uctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // the grid canvas stays in device pixels: see edgeX/edgeY
   const small = W < 640;
   CW = small ? 6 : 8; CH = small ? 7 : 9;   // tiles big enough to read as squares, as in the reference
   scale = Math.max(0.38, Math.min(1.15, W / 1440)) * 1.9;      // fish 1.3× larger than the first pass (client: «рыбок чуть побольше»)
@@ -78,6 +85,11 @@ function resize() {
   wakeB = new Float32Array(n);
   showV = new Float32Array(n); showC = new Uint8Array(n); showG = new Uint8Array(n); showO = new Int16Array(n);
   showK = new Uint32Array(n); keyB = new Uint32Array(n); bandB = new Uint8Array(n);
+  // each cell's edges in whole device pixels. At 125 % or 150 % zoom a 9 px row is 11.25 or 13.5 device pixels, and a
+  // sprite drawn there bleeds half a pixel into its neighbour, which clearing that neighbour then leaves behind as a hairline
+  edgeX = Int32Array.from({ length: cols + 1 }, (_, c) => Math.round(c * CW * dpr));
+  edgeY = Int32Array.from({ length: rows + 1 }, (_, r) => Math.round(r * CH * dpr));
+  drawn = new Uint32Array(n);                // the sprite each cell shows on screen now (0: empty); resizing cleared the canvas
   buildAtlas();
   fish.forEach(f => f.rescale && f.rescale());
 }
@@ -94,6 +106,31 @@ function buildAtlas() {
     x.font = `600 ${Math.round(CH * 1.02 * dpr)}px 'JetBrains Mono', ui-monospace, monospace`;
     return { cv, x, nv, painted: new Uint8Array(total) };   // sprites are painted lazily, the first time a cell asks for them
   });
+  // new sprites (a theme change, the web font arriving): every cell has to be drawn again
+  if (drawn) { drawn.fill(0); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+  warmAtlas();
+}
+// Painting a sprite the first time a cell needs it stalled whole frames: a busy moment asked for dozens of new ones at
+// once (slow frames averaged 9 first paints, smooth ones 0.6) and each forces the atlas texture to be re-uploaded before
+// it can be drawn. So the atlases are filled ahead of time, in the browser's idle moments, a few milliseconds at a time;
+// a sprite still missing when asked for is painted on the spot as before
+let warmJob = 0;
+function warmAtlas() {
+  const idle = window.requestIdleCallback || (cb => setTimeout(() => cb({ timeRemaining: () => 6 }), 30));
+  const job = ++warmJob, order = [0, 2, 1];   // plain bodies first, then fins and water, then the lit bodies of called fish
+  let t = 0, key = 0;
+  const step = deadline => {
+    if (job !== warmJob) return;               // a newer atlas replaced this one
+    // one sprite at a time, checking the clock between them, so a slice never runs into the next frame
+    while (t < order.length && deadline.timeRemaining() > 3) {
+      const A = atlases[order[t]];
+      while (key < A.painted.length && A.painted[key]) key++;
+      if (key < A.painted.length) paint(order[t], key++);
+      else { t++; key = 0; }
+    }
+    if (t < order.length) idle(step);
+  };
+  idle(step);
 }
 function paint(type, key) {
   const A = atlases[type], actx = A.x, vr = key % A.nv, k = (key / A.nv) | 0;
@@ -136,11 +173,15 @@ function paint(type, key) {
   }
   A.painted[key] = 1;
 }
-function blit(type, c, lv, g, X, Y, vr = 0, to = ctx) {
-  const A = atlases[type], key = ((c * LEVELS + lv) * NG + g) * A.nv + (A.nv > 1 ? vr : 0);
+// a sprite as one number: type in the top bits, its key in the atlas below, +1 so that 0 can mean "nothing"
+const SPRITE = 1 << 20;
+const sprite = (type, c, lv, g, vr = 0) => type * SPRITE + ((c * LEVELS + lv) * NG + g) * atlases[type].nv + (atlases[type].nv > 1 ? vr : 0) + 1;
+function blitCode(code, X, Y, to = ctx) {
+  const type = (code / SPRITE) | 0, key = code - type * SPRITE - 1, A = atlases[type];
   if (!A.painted[key]) paint(type, key);
   to.drawImage(A.cv, (key % SPR_COLS) * sw, ((key / SPR_COLS) | 0) * sh, sw, sh, X, Y, CW, CH);
 }
+function blit(type, c, lv, g, X, Y, vr = 0, to = ctx) { blitCode(sprite(type, c, lv, g, vr), X, Y, to); }
 // theme: the page's <html data-theme> is light, dark or system (follow the device). Night water repaints the atlas
 const darkMQ = matchMedia('(prefers-color-scheme: dark)');
 let night = false;
@@ -674,9 +715,9 @@ function drawGlow() {
     const c = LOOK[f.p.col].glow, k = 0.3 * f.glow * breathe;
     const pools = [0.08, 0.28, 0.48, 0.68, 0.88].map(u => { const a = f.at(u); return [a.x, a.y, a.w * 2.8 + 30]; });
     for (const [x, y, r] of pools) {
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      const g = uctx.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, rgba(c, k)); g.addColorStop(0.5, rgba(c, k * 0.4)); g.addColorStop(1, rgba(c, 0));
-      ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      uctx.fillStyle = g; uctx.fillRect(x - r, y - r, r * 2, r * 2); underUsed = true;
     }
   }
 }
@@ -688,12 +729,12 @@ function render(dt) {
     for (let i = 0; i < n; i++) { const th = i / n * TAU; stampWake(r.x + Math.cos(th) * r.r, r.y + Math.sin(th) * r.r * 0.8, 0.9 * a); }
   }
   for (const f of foam) stampWake(f.x, f.y, f.k * f.life / f.max);
-  ctx.clearRect(0, 0, W, H);
-  ctx.font = `600 ${Math.round(CH * 1.02)}px 'JetBrains Mono', ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (underUsed) { uctx.clearRect(0, 0, W, H); underUsed = false; }
   drawGlow();
   const rise = dt > 0 ? 1 - Math.exp(-dt * 20) : 1, fall = dt > 0 ? Math.exp(-dt * 11) : 0;
   for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
-    const i = cy * cols + cx, X = cx * CW, Y = cy * CH;
+    const i = cy * cols + cx;
+    let code = 0;
     // A cell eases toward what the fish stamps into it and, once the fish has moved on, fades over ~250 ms.
     // Without this a cell is either on or off, and the body visibly hops from cell to cell.
     if (own[i] >= 0) { showV[i] += (val[i] - showV[i]) * rise; showC[i] = col[i]; showG[i] = gly[i]; showO[i] = own[i]; showK[i] = keyB[i]; }
@@ -716,13 +757,19 @@ function render(dt) {
         const tone = h2 > 0.975 ? 5 : grey ? Math.max(0, Math.min(4, Math.round(bd * 1.3 + (h2 - 0.5) * 1.2)))
           : Math.max(0, Math.min(4, Math.round(0.9 + bd * 0.55 + (h2 - 0.5) * 1.6)));
         const GL = bd === 0 && h1 > 0.8 ? G_BARE : set[(h1 * set.length) | 0];
-        blit(hot, c, lv, GL, X, Y, tone);
+        code = sprite(hot, c, lv, GL, tone);
       } else {
         const glyph = gg === 1 ? G_EYE : gg >= 2 ? G_RAY + gg - 2 : Math.min(RAMP_N - 1, (v * RAMP_N) | 0);
-        blit(sheer ? 2 : hot, c, lv, glyph, X, Y, gg === 1 ? 4 : 1);   // the eye: a light mark on a dark square
+        code = sprite(sheer ? 2 : hot, c, lv, glyph, gg === 1 ? 4 : 1);
       }
     } else if (wakeB[i] > 0.05) {
-      blit(2, 9, Math.min(LEVELS - 1, (wakeB[i] * LEVELS) | 0), wakeB[i] > 0.45 ? 1 : 0, X, Y);
+      code = sprite(2, 9, Math.min(LEVELS - 1, (wakeB[i] * LEVELS) | 0), wakeB[i] > 0.45 ? 1 : 0);
+    }
+    if (code !== drawn[i]) {
+      const x0 = edgeX[cx], y0 = edgeY[cy], w = edgeX[cx + 1] - x0, h = edgeY[cy + 1] - y0;
+      ctx.clearRect(x0, y0, w, h);
+      if (code) { const type = (code / SPRITE) | 0, key = code - type * SPRITE - 1, A = atlases[type]; if (!A.painted[key]) paint(type, key); ctx.drawImage(A.cv, (key % SPR_COLS) * sw, ((key / SPR_COLS) | 0) * sh, sw, sh, x0, y0, w, h); }
+      drawn[i] = code;
     }
   }
   drawLogo();
@@ -735,7 +782,7 @@ function render(dt) {
 const LOGO_PATH = new Path2D('M30 12 0 30l30 18v-9.5L15.5 30 30 21.5zM57 0h10L43 60H33zM70 12l30 18-30 18v-9.5L84.5 30 70 21.5z');
 const logoBox = document.querySelector('.ring-word .logo');
 const GLINT_BAND = 0.17, GLINT_TIME = 0.9;
-let logoCells = [], logoKey = '', glintAt = 1.5, glintMasked = false;
+let logoCells = [], logoKey = '', glintAt = 1.5, glintMasked = false, underUsed = false;
 function buildLogo() {
   logoCells = [];
   if (!logoBox) return;
@@ -775,7 +822,7 @@ function drawLogo() {
     let tone = Math.max(0, Math.round(4 - lead * 3.4 - (h2 > 0.6 ? 1 : 0)));
     if (lead > 0.35 && h2 > 0.88) tone = 5;
     const set = SHARK_BANDS[lead > 0.5 ? 2 : 3], g = set[(h1 * set.length) | 0];
-    blit(0, 0, LEVELS - 1, g === G_BARE ? set[0] : g, r.left + c.x, r.top + c.y, tone);
+    blit(0, 0, LEVELS - 1, g === G_BARE ? set[0] : g, r.left + c.x, r.top + c.y, tone, uctx); underUsed = true;
   }
 }
 function frame(now) {
@@ -787,7 +834,7 @@ function frame(now) {
   if (!still) { simulate(dt * (reduced.matches ? 0.35 : 1), now); shimT += dt * (reduced.matches ? 0.35 : 1); }
   else for (const f of fish) f.glow += ((f.mode !== 'free' ? 1 : 0) - f.glow) * 0.5;
   render(still ? 0 : dt);
-  canvas.classList.add('is-ready');
+  canvas.classList.add('is-ready'); under.classList.add('is-ready');
   // keep the clock running between frames: resetting it here would drop render time from dt and slow the whole pond down
   if (!document.hidden && (!still || fish.some(f => Math.abs((f.mode !== 'free' ? 1 : 0) - f.glow) > 0.02))) raf = requestAnimationFrame(frame);
 }
@@ -820,8 +867,10 @@ addEventListener('resize', () => {
   });
   wake();
 });
-// glyphs painted before the web font arrived would stay in the fallback face forever: repaint the atlas once it lands
-if (document.fonts) document.fonts.ready.then(() => { buildAtlas(); wake(); });
+// glyphs painted before the web font arrived would stay in the fallback face forever: repaint the atlas once it lands.
+// Only then: rebuilding an atlas that was already right threw away the warm-up and stalled the first seconds
+const MONO = "600 12px 'JetBrains Mono'";
+if (document.fonts && !document.fonts.check(MONO)) document.fonts.load(MONO).then(() => { buildAtlas(); wake(); });
 
 resize(); populate();
 // settle the pond before the first visible frame, so fish are mid-swim, not spawning
