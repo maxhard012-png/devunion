@@ -109,6 +109,14 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
   border:1px solid var(--edge);border-radius:8px;padding:9px 28px 9px 12px;cursor:pointer;-webkit-appearance:none;appearance:none;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .pick:hover{color:var(--ink);border-color:var(--edge2)}
+/* the theme switch: a pill with the sun at the left end and the moon at the right; the knob slides under the active one */
+.theme-toggle{position:relative;display:flex;align-items:center;justify-content:space-between;width:66px;padding:0 9px;border-radius:999px;
+  background:var(--glass);align-self:stretch}
+.theme-toggle svg{position:relative;width:14px;height:14px;color:var(--ink3);transition:color .25s}
+.theme-toggle .knob{position:absolute;left:3px;top:3px;bottom:3px;width:calc(50% - 4px);border-radius:999px;background:var(--glass-strong);
+  box-shadow:0 1px 3px rgba(0,0,0,.2),inset 0 0 0 1px var(--edge);transition:translate .3s cubic-bezier(.2,.8,.2,1)}
+:root[data-theme="dark"] .theme-toggle .knob{translate:calc(100% + 2px) 0}   /* from the theme set in <head>: no slide on page load */
+:root:not([data-theme="dark"]) .theme-toggle .sun,:root[data-theme="dark"] .theme-toggle .moon{color:var(--ink)}
 
 /* ── shared pieces ──────────────────────────────────────────────────── */
 .eyebrow{font:500 11px/1.3 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--fish)}
@@ -305,6 +313,7 @@ textarea{resize:vertical;min-height:140px}
 }
 @media (prefers-reduced-motion:reduce){
   .ring-main .ring-item{animation:none}
+  .theme-toggle .knob{transition:none}
   .ring-item,.ring-items,.ring-arc,.ring-span,.ring-sub,.ring-word,.card-go,.catalog-row,.button{transition:none}
   .ring-item:hover,.button:hover{transform:none}
 }

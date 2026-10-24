@@ -10,12 +10,13 @@ function language(next){lang=DICT[next]?next:'en';document.documentElement.lang=
  $$('[data-i]').forEach(el=>el.innerHTML=T(el.dataset.i));
  $$('[data-i-aria]').forEach(el=>el.setAttribute('aria-label',T(el.dataset.iAria)));
  const tt=$('title[data-i-title]');if(tt)document.title=T(tt.dataset.iTitle)+' — DevUnion';
- if(picker)picker.value=lang;try{localStorage.setItem('devunion-lang',lang)}catch{}}
+ if(picker)picker.value=lang;themeLabel();try{localStorage.setItem('devunion-lang',lang)}catch{}}
 if(picker)picker.addEventListener('change',()=>language(picker.value));
-// theme: light (default), dark, or the device's own; the <head> sets it before paint, this keeps the switch and the pond in step
-const themePick=$('.theme'),html=document.documentElement;
-function theme(m){m=['light','dark','system'].includes(m)?m:'light';html.dataset.theme=m;if(themePick)themePick.value=m;try{localStorage.setItem('devunion-theme',m)}catch{};dispatchEvent(new CustomEvent('pond:theme'))}
-if(themePick){themePick.value=html.dataset.theme||'light';themePick.addEventListener('change',()=>theme(themePick.value))}
+// theme: light (default) or dark, one sun/moon switch; the <head> sets it before paint, this keeps the button and the pond in step
+const themeBtn=$('.theme-toggle'),html=document.documentElement;
+function themeLabel(){if(themeBtn)themeBtn.setAttribute('aria-checked',String(html.dataset.theme==='dark'))}
+function theme(m){html.dataset.theme=m==='dark'?'dark':'light';themeLabel();try{localStorage.setItem('devunion-theme',html.dataset.theme)}catch{};dispatchEvent(new CustomEvent('pond:theme'))}
+if(themeBtn)themeBtn.addEventListener('click',()=>theme(html.dataset.theme==='dark'?'light':'dark'));
 // path bar: a chevron opens what lies under its step; one menu at a time; a click outside or Escape closes it,
 // arrow keys walk the links inside
 const crumbMenus=$$('.crumb-more');
