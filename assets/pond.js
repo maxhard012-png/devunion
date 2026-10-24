@@ -255,8 +255,8 @@ class Fish {
     this.rescale(); this.v = this.spd; this.resetTrail();
   }
   // speed follows body size, so a fish crosses the same share of its own length per second on any screen (on a big screen
-  // the bodies grow; with fixed px/s they looked sluggish), then eased to 1.05× and raised 30% again on request (client, 2026-10-23)
-  rescale() { this.L = this.p.len * scale; this.spd = this.p.speed * (scale / 1.9) * 1.365; }
+  // the bodies grow; with fixed px/s they looked sluggish), then eased to 1.05× and raised 30% (2026-10-23) and 15% more (2026-10-24) on request
+  rescale() { this.L = this.p.len * scale; this.spd = this.p.speed * (scale / 1.9) * 1.57; }
   resetTrail() {
     this.trail = [];
     for (let i = 0; i < 300; i++) this.trail.push([this.x - Math.cos(this.a) * i * 2, this.y - Math.sin(this.a) * i * 2]);
@@ -340,7 +340,7 @@ class Fish {
     // 5. a startle (click in the water) overrides everything for a moment: bolt away
     if (this.startle > 0) {
       this.startle -= dt;
-      goal = this.flee; weight = 1; want = this.spd * 2.2; turnMax *= 2.2; resp = 3.5;
+      goal = this.flee; weight = 1; want = this.spd * 2.2 * (this.bolt || 1); turnMax *= 2.2; resp = 3.5;
     }
     // 6. called by a button or a catalogue row
     if (this.mode !== 'free' && this.btn) {
@@ -386,11 +386,12 @@ class Fish {
       this.v = Math.min(this.v * Math.exp(-dt * 0.35), this.spd * 2.4 * Math.max(1, rel));
       // a called koi still strokes, but its speed is pulled straight toward the goal: strokes alone took up to 5 s to arrive
       if (this.mode !== 'free') this.v += (want * 0.7 - this.v) * Math.min(1, dt * 2.5);
+      if (this.startle > 0) this.v += (want - this.v) * Math.min(1, dt * 4);   // a startled koi darts, it does not wait for a stroke
       this.amp += (0.32 + 0.9 * thrust - this.amp) * Math.min(1, dt * 3);
       this.phase += dt * (1.6 + 6 * this.amp);
     } else {
       // sharks: no bursts, a steady sweep; acceleration is slow and so is the beat
-      this.v += (want - this.v) * Math.min(1, dt * (want > this.v ? (this.mode === 'free' ? 1.6 : 4) : 0.9));
+      this.v += (want - this.v) * Math.min(1, dt * (want > this.v ? (this.startle > 0 ? 5 : this.mode === 'free' ? 1.6 : 4) : 0.9));
       this.amp += (0.55 + 0.45 * Math.min(1.3, this.v / this.spd) - this.amp) * Math.min(1, dt * 2);
       this.phase += dt * (1.1 + (this.v / this.L) * 7);
     }
@@ -600,17 +601,15 @@ $$('[data-guide]').forEach(btn => {
   btn.addEventListener('focus', () => call('hover'));
   btn.addEventListener('pointerleave', release);
   btn.addEventListener('blur', release);
-  btn.addEventListener('click', e => {
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || reduced.matches) return;
+  // a click opens the page at once; its fish only lights up. Waiting for the fish to arrive first (up to 0.9 s, more on
+  // a slow machine) read as a dead or laggy button (client, 2026-10-24)
+  btn.addEventListener('click', () => {
     const g = guides[btn.dataset.guide]; if (!g) return;
-    e.preventDefault();
     g.mode = 'call'; g.btn = btn; btn.classList.add('is-called'); wake();
-    const go = () => { if (!btn.dataset.gone) { btn.dataset.gone = '1'; location.href = btn.href; } };
-    g.arrive = go; setTimeout(go, 900);
   });
 });
 addEventListener('pageshow', () => {
-  $$('[data-guide]').forEach(b => { delete b.dataset.gone; b.classList.remove('is-called'); });
+  $$('[data-guide]').forEach(b => b.classList.remove('is-called'));
   fish.forEach(f => { if (f.mode === 'call') { f.mode = 'free'; f.pickTarget(); } });
 });
 addEventListener('pointermove', e => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.on = e.pointerType !== 'touch'; pointer.moved = clock; });
@@ -620,13 +619,23 @@ addEventListener('pond:ripple', e => { ripples.push({ x: e.detail.x, y: e.detail
 const retheme = () => { readTheme(); tintButtons(); buildAtlas(); wake(); };
 addEventListener('pond:theme', retheme);
 darkMQ.addEventListener('change', retheme);
-// a tap in open water: a ripple, and every fish near it bolts
+// a tap in the water: a ripple, and the fish react. Distance is to the nearest point of the body, not the head, so a tap
+// on a long shark's tail counts. A fish tapped directly darts off hard for over a second, the way a real one bolts when
+// touched; fish nearby only flinch away
 document.addEventListener('pointerdown', e => {
   if (e.target.closest('a,button,input,select,textarea,summary,label')) return;
-  ripples.push({ x: e.clientX, y: e.clientY, r: 0, max: 170, speed: 120 });
-  for (const f of fish) if (f.L) {
-    const d = Math.hypot(f.x - e.clientX, f.y - e.clientY);
-    if (d < 260) { f.startle = 0.5 + 0.4 * (1 - d / 260); f.flee = Math.atan2(f.y - e.clientY, f.x - e.clientX); f.kickT = 0; }
+  const x = e.clientX, y = e.clientY;
+  ripples.push({ x, y, r: 0, max: 170, speed: 120 });
+  for (const f of fish) if (f.L && !f.away) {
+    let d = Infinity, k = 0;
+    for (let i = 0; i < f.sx.length; i++) { const di = Math.hypot(f.sx[i] - x, f.sy[i] - y); if (di < d) { d = di; k = i; } }
+    const hit = d < f.at(k / (f.sx.length - 1)).w + 14;
+    if (hit) { f.startle = 1.3; f.bolt = 1.5; ripples.push({ x, y, r: 0, max: 110, speed: 160 }); }
+    else if (d < 220) { f.startle = 0.45 + 0.35 * (1 - d / 220); f.bolt = 1; }
+    else continue;
+    // flee away from the tap, bent toward the way the fish already faces so it shoots forward rather than spinning round
+    const away = Math.atan2(f.y - y, f.x - x);
+    f.flee = away + clamp(angDiff(f.a, away), -0.9, 0.9); f.kickT = 0;
   }
   wake();
 });
@@ -647,7 +656,6 @@ function simulate(dt, t) {
     if (f.mode === 'free') f.reentered = false;
     f.steer(dt, t); f.move(dt, t);
     if (f.mode === 'free' && t - f.enteredAt > 3000 && f.offscreen()) { f.away = true; f.awayT = 2 + Math.random() * 8; continue; }
-    if (f.mode === 'call' && f.arrive) { const r = f.btn.getBoundingClientRect(); if (Math.hypot(f.x - r.left - r.width / 2, f.y - r.top - r.height / 2) < 30) f.arrive(); }
   }
   for (let i = foam.length - 1; i >= 0; i--) {
     const f = foam[i]; f.life -= dt;
