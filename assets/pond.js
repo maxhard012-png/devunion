@@ -291,13 +291,13 @@ class Fish {
     this.kickT = Math.random(); this.heading = this.a; this.nextTurn = 0; this.stroke = 1; this.power = 1; this.foamAcc = 0; this.fin = 0.5; this.glow = 0; this.mode = 'free'; this.z = 0.5; this.startle = 0;
     this.nibbleT = 0;
     // the long script: pace changes, koi lingering, and leaving the frame to come back elsewhere
-    this.pace = 1; this.paceGoal = 1; this.paceT = 0; this.linger = 0; this.away = false; this.awayT = 0; this.enteredAt = 0; this.bold = Math.random() < 0.2;
+    this.pace = 1; this.paceGoal = 1; this.paceT = 0; this.linger = 0; this.away = false; this.awayT = 0; this.enteredAt = 0; this.bold = false;
     this.sx = new Float32Array(SEG); this.sy = new Float32Array(SEG); this.nx = new Float32Array(SEG); this.ny = new Float32Array(SEG);
     this.rescale(); this.v = this.spd; this.resetTrail();
   }
   // speed follows body size, so a fish crosses the same share of its own length per second on any screen (on a big screen
-  // the bodies grow; with fixed px/s they looked sluggish), then eased to 1.05× and raised 30% (2026-10-23) and 15% more (2026-10-24) on request
-  rescale() { this.L = this.p.len * scale; this.spd = this.p.speed * (scale / 1.9) * 1.57; }
+  // the bodies grow; with fixed px/s they looked sluggish), then eased to 1.05× and raised 30% (2026-10-23), 15% (2026-10-24) and 20% more (2026-10-27) on request
+  rescale() { this.L = this.p.len * scale; this.spd = this.p.speed * (scale / 1.9) * 1.88; }
   resetTrail() {
     this.trail = [];
     for (let i = 0; i < 300; i++) this.trail.push([this.x - Math.cos(this.a) * i * 2, this.y - Math.sin(this.a) * i * 2]);
@@ -323,7 +323,7 @@ class Fish {
     this.a = this.heading = Math.atan2(ty - ey, tx - ex);
     this.x = ex - Math.cos(this.a) * this.L * 0.1; this.y = ey - Math.sin(this.a) * this.L * 0.1;
     this.omega = 0; this.v = this.spd; this.nextTurn = t + 4000; this.enteredAt = t;
-    this.away = false; this.bold = Math.random() < 0.2;
+    this.away = false; this.bold = false;
     this.resetTrail();
   }
   // Steering works on angular velocity, never on heading directly: every turn eases in and out, so paths are curves, not corners.
@@ -352,9 +352,9 @@ class Fish {
     let target = clamp(angDiff(this.heading, this.a) * 1.4, -turnMax * 0.6, turnMax * 0.6)
       + (vnoise(t * 0.0005 + this.seed, this.seed) - 0.5) * p.wander * 0.3;   // only a faint meander on the straight
     let goal = null, weight = 0;
-    // 2. soft walls: fish may cross the frame and turn back off-screen, the way a pond seen from above is framed; only a look-ahead
-    //    well past the edge turns them home
-    const look = L * 0.3 + this.v * 0.8, lx = this.x + Math.cos(this.a) * look, ly = this.y + Math.sin(this.a) * look, m = this.bold ? -L * 0.5 : L * 0.15;
+    // 2. soft walls: the fish stay in the frame (client, 2026-10-27). The look-ahead reaches about a turning circle ahead,
+    //    so a fish starts its turn early enough to come round before its head reaches the edge
+    const look = L * 0.55 + this.v * 1.4, lx = this.x + Math.cos(this.a) * look, ly = this.y + Math.sin(this.a) * look, m = Math.min(L * 0.12, 60);
     const over = Math.max(m - lx, lx - (W - m), m - ly, ly - (H - m), 0);
     if (over > 0) {
       if (!this.home || this.homeT < t) { this.home = [W * (0.12 + Math.random() * 0.76), H * (0.12 + Math.random() * 0.76)]; this.homeT = t + 4000; }
