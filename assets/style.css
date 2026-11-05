@@ -9,7 +9,7 @@
      --water-deep, the darker end, and on glass */
   --water:#f3f3f1; --water-deep:#e7e7e4; --haze:rgba(255,255,255,.45);
   --ink:#15171a; --ink2:#4d5258; --ink3:#5b6066;
-  --glass:rgba(255,255,255,.8); --glass-strong:rgba(255,255,255,.88); --edge:rgba(18,20,24,.1); --edge2:rgba(18,20,24,.2);
+  --glass:rgba(255,255,255,.8); --card:#fbfbfa; --glass-strong:rgba(255,255,255,.88); --edge:rgba(18,20,24,.1); --edge2:rgba(18,20,24,.2);
   --wash:rgba(18,20,24,.045); --sunk:rgba(255,255,255,.75); --veil:rgba(243,243,241,.96); --scrim:rgba(20,22,26,.22);
   --danger:#c02f22;
   --display:'Onest',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
@@ -21,7 +21,7 @@
 :root[data-theme="dark"]{
   --water:#171717; --water-deep:#0f0f0f; --haze:rgba(255,255,255,.04);
   --ink:#e8eeec; --ink2:#b3bdbb; --ink3:#9aa5a3;
-  --glass:rgba(32,32,32,.84); --glass-strong:rgba(36,36,36,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
+  --glass:rgba(32,32,32,.84); --card:#1d1d1d; --glass-strong:rgba(36,36,36,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
   --wash:rgba(255,255,255,.05); --sunk:rgba(0,0,0,.28); --veil:rgba(23,23,23,.96); --scrim:rgba(0,0,0,.5);
   --danger:#ff8a7c;
   color-scheme:only dark;
@@ -30,7 +30,7 @@
   :root[data-theme="system"]{
     --water:#171717; --water-deep:#0f0f0f; --haze:rgba(255,255,255,.04);
     --ink:#e8eeec; --ink2:#b3bdbb; --ink3:#9aa5a3;
-    --glass:rgba(32,32,32,.84); --glass-strong:rgba(36,36,36,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
+    --glass:rgba(32,32,32,.84); --card:#1d1d1d; --glass-strong:rgba(36,36,36,.9); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.2);
     --wash:rgba(255,255,255,.05); --sunk:rgba(0,0,0,.28); --veil:rgba(23,23,23,.96); --scrim:rgba(0,0,0,.5);
     --danger:#ff8a7c;
     color-scheme:only dark;
@@ -150,18 +150,6 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .home-main{position:relative;z-index:2;overflow-x:clip}   /* the blur behind the name may reach past the screen edge */
 .pond-hero{position:relative;min-height:100vh;display:grid;place-items:center;padding:84px var(--gutter) 100px;pointer-events:none}
 .ring{--D:min(66vh,600px,60vw);--R:calc(var(--D) / 2);position:relative;width:var(--D);aspect-ratio:1}
-/* the dial: fine ticks all the way round, cut from a conic stripe with a thin ring mask */
-.ring-ticks,.ring-arc{position:absolute;inset:0;border-radius:50%;pointer-events:none}
-.ring-ticks{background:repeating-conic-gradient(var(--ink3) 0deg .5deg,transparent .5deg 3deg);opacity:.55;
-  -webkit-mask:radial-gradient(closest-side,transparent calc(100% - 7px),#000 calc(100% - 7px) calc(100% - 1px),transparent 100%);
-  mask:radial-gradient(closest-side,transparent calc(100% - 7px),#000 calc(100% - 7px) calc(100% - 1px),transparent 100%)}
-/* the lit arc glides round the dial to the hovered station: a fixed 40° wedge that turns as a whole (a rotation the GPU
-   does on its own, where animating the gradient's angle repainted the whole dial every frame) */
-.ring-arc{--arc-color:var(--fish);background:conic-gradient(var(--arc-color) 0deg 40deg,transparent 40deg);opacity:0;rotate:-110deg;will-change:rotate,opacity;
-  -webkit-mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 4px) calc(100% - 1px),transparent 100%);
-  mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 4px) calc(100% - 1px),transparent 100%);
-  transition:rotate .6s cubic-bezier(.2,.8,.2,1),opacity .3s}
-.ring-arc.is-lit{opacity:1}
 .ring-core{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;text-align:center;pointer-events:none}
 .ring-word{position:relative;margin:0;line-height:0;color:var(--ink)}
 .ring-word .logo{width:calc(var(--D) * .42);height:auto}   /* the </> mark in the middle of the dial */
@@ -241,10 +229,13 @@ a.catalog-row:hover,a.catalog-row:focus-visible,.catalog-row.is-called{backgroun
 
 /* ── team: a card per person, the portrait drawn in ASCII on a canvas (assets/devunion.js) ── */
 .team{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.member{position:relative;padding:14px 14px 16px;background:var(--glass);border:1px solid var(--edge);border-radius:var(--r);transition:border-color .2s,background-color .2s}
-.member:hover{background:var(--glass-strong);border-color:var(--edge2)}
+/* cards are solid, so a fish passing behind does not muddy the portrait */
+.member{position:relative;padding:14px 14px 16px;background:var(--card);border:1px solid var(--edge);border-radius:var(--r);transition:border-color .2s,background-color .2s}
+.member:hover{border-color:var(--edge2)}
 .member-n{position:absolute;left:14px;top:12px;font:500 11px/1 var(--mono);color:var(--ink3)}
-.ascii-face{display:block;width:100%;aspect-ratio:1;color:var(--ink)}
+/* a hand-drawn ASCII portrait: heavy, tight, as large as the square allows (0.6 is the mono font's advance) */
+.ascii-face{display:grid;place-content:center;width:100%;aspect-ratio:1;container-type:inline-size;color:var(--ink)}
+.ascii-face pre{margin:0;font:800 min(calc(100cqi / var(--cols) / .6),calc(100cqi / var(--rows)))/1 var(--mono);letter-spacing:0;white-space:pre}
 .member-name{margin-top:10px;font:500 17px/1.2 var(--display);letter-spacing:-.01em}
 .member-role{margin-top:4px;font:500 11.5px/1.3 var(--mono);color:var(--ink3)}
 .team-write{display:flex;justify-content:center;margin-top:28px}
@@ -257,7 +248,7 @@ a.catalog-row:hover,a.catalog-row:focus-visible,.catalog-row.is-called{backgroun
 
 /* ── contact us ─────────────────────────────────────────────────────── */
 .brief-layout{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr);gap:14px;align-items:start}
-.brief-card{display:flex;flex-direction:column;align-items:flex-start;padding:22px;background:var(--glass);border:1px solid var(--edge);border-radius:var(--r)}
+.brief-card{display:flex;flex-direction:column;align-items:flex-start;padding:22px;background:var(--card);border:1px solid var(--edge);border-radius:var(--r)}
 .brief-card .ascii-face{width:min(100%,220px);margin-bottom:6px}
 .brief-card .button{margin-top:16px}
 .brief-how{margin-top:16px;padding-left:12px;border-left:2px solid var(--fish);font-size:14px;line-height:1.5;color:var(--ink2)}
@@ -306,6 +297,6 @@ textarea{resize:vertical;min-height:92px}
 @media (prefers-reduced-motion:reduce){
   .ring-main .ring-item{animation:none}
   .theme-toggle .knob{transition:none}
-  .ring-item,.ring-items,.ring-arc,.ring-span,.ring-sub,.ring-word,.card-go,.catalog-row,.button{transition:none}
+  .ring-item,.ring-items,.ring-span,.ring-sub,.ring-word,.card-go,.catalog-row,.button{transition:none}
   .ring-item:hover,.button:hover{transform:none}
 }
