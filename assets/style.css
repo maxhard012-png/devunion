@@ -232,9 +232,13 @@ a.catalog-row:hover,a.catalog-row:focus-visible,.catalog-row.is-called{backgroun
 /* cards are solid, so a fish passing behind does not muddy the portrait */
 .member{position:relative;padding:14px 14px 16px;background:var(--card);border:1px solid var(--edge);border-radius:var(--r);transition:border-color .2s,background-color .2s}
 .member:hover{border-color:var(--edge2)}
-.member-n{position:absolute;left:14px;top:12px;font:500 11px/1 var(--mono);color:var(--ink3)}
+.member-n{position:absolute;z-index:1;left:10px;top:9px;padding:3px 5px;border-radius:6px;background:var(--card);font:500 11px/1 var(--mono);color:var(--ink3)}
 /* a hand-drawn ASCII portrait: heavy, tight, as large as the square allows (0.6 is the mono font's advance) */
 .ascii-face{display:grid;place-content:center;width:100%;aspect-ratio:1;container-type:inline-size;color:var(--ink)}
+/* or the picture the person sent, as it is, filling the square */
+.ascii-face.photo{display:block;overflow:hidden;border-radius:calc(var(--r) - 4px);background:var(--wash)}
+.ascii-face.photo img{display:block;width:100%;height:100%;object-fit:cover}
+.ascii-face.pixel img{image-rendering:pixelated}
 .ascii-face pre{margin:0;font:800 min(calc(100cqi / var(--cols) / .6),calc(100cqi / var(--rows)))/1 var(--mono);letter-spacing:0;white-space:pre}
 .member-name{margin-top:10px;font:500 17px/1.2 var(--display);letter-spacing:-.01em}
 .member-role{margin-top:4px;font:500 11.5px/1.3 var(--mono);color:var(--ink3)}
