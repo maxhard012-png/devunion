@@ -567,11 +567,13 @@ class Fish {
       const a = this.at(0.5), sz = L * 0.06;
       for (const s of [-1, 1]) { const rx = a.x + a.nx * a.w * s, ry = a.y + a.ny * a.w * s; stampTri(rx, ry, rx + a.nx * sz * s - a.fx * sz, ry + a.ny * sz * s - a.fy * sz, rx - a.fx * sz * 1.2, ry - a.fy * sz * 1.2, 0.42 * b, p.koi[1], true); }
     }
-    { // long flowing tail: two lobes of rays that lag behind the beat
-      const a = this.at(0.8), tl = L * 0.34, sw = Math.sin(this.phase - 4.6) * 0.55;
+    { // long flowing tail: two lobes of rays that lag behind the beat. Rooted near the tip and aimed along the tip's own
+      // direction: rooted at 0.8 and aimed along the body there, a tight hairpin left the fin pointing straight into the
+      // loop while the tail curled away, a fan of rays across the inside of the U (client video, 2026-11-08)
+      const a = this.at(0.9), d = this.at(0.99), tl = L * 0.26, sw = Math.sin(this.phase - 4.6) * 0.55;
       for (const s of [-1, 1]) {
-        const ex = a.x - a.fx * tl + a.nx * (s * 0.45 + sw) * tl, ey = a.y - a.fy * tl + a.ny * (s * 0.45 + sw) * tl;
-        stampTri(a.x, a.y, ex, ey, a.x - a.fx * tl * 0.7 + a.nx * sw * tl, a.y - a.fy * tl * 0.7 + a.ny * sw * tl, 0.55 * b, p.koi[1], true);
+        const ex = a.x - d.fx * tl + d.nx * (s * 0.45 + sw) * tl, ey = a.y - d.fy * tl + d.ny * (s * 0.45 + sw) * tl;
+        stampTri(a.x, a.y, ex, ey, a.x - d.fx * tl * 0.7 + d.nx * sw * tl, a.y - d.fy * tl * 0.7 + d.ny * sw * tl, 0.55 * b, p.koi[1], true);
       }
     }
     { // dorsal: a thin ray strip along the back
