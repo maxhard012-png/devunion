@@ -63,23 +63,13 @@ if($('#brief-form')){const form=$('#brief-form'),status=$('#brief-status'),pick=
  form.addEventListener('submit',async e=>{e.preventDefault();if(!form.reportValidity())return;if(document.fonts)await document.fonts.ready;
   const url=URL.createObjectURL(pdf(page())),link=document.createElement('a'),who=(new FormData(form).get('name')||'').trim().replace(/[^\p{L}\p{N}]+/gu,'-').slice(0,40);
   link.href=url;link.download=`DevUnion-brief${who?'-'+who:''}.pdf`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);status.textContent=T('s_pdf')})}
-// "Our projects" turns the dial over to the projects instead of leaving the page; #projects keeps that view on reload and
-// lets the browser's back button turn it back. Without script the station is an ordinary link to /projects
 const ring=$('.ring');
-if(ring){const main=$('.ring-main'),proj=$('.ring-projects'),opener=$('[aria-controls="ring-projects"]');
- const view=(v,focus)=>{const p=v==='projects';ring.dataset.view=v;document.body.classList.toggle('view-projects',p);main.inert=p;proj.inert=!p;opener.setAttribute('aria-expanded',String(p));
-  if(focus)(p?proj.querySelector('a'):opener).focus({preventScroll:true})};
- opener.addEventListener('click',e=>{if(e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();e.stopImmediatePropagation();history.pushState(null,'','#projects');view('projects',e.detail===0)});
- let refocus=false;   // the back button hides itself, so focus goes to the station that opened the view
- $('.ring-back').addEventListener('click',()=>{if(location.hash==='#projects'){refocus=true;history.back()}else view('main',true)});
- addEventListener('popstate',()=>{view(location.hash==='#projects'?'projects':'main',refocus);refocus=false});
- document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ring.dataset.view==='projects')$('.ring-back').click()});
- view(location.hash==='#projects'?'projects':'main',false);
- // number keys, as in a terminal menu: 1–4 pick a section, 1–5 a project on the turned dial; each station shows its key
+if(ring){const main=$('.ring-main');
+ // number keys, as in a terminal menu: 1–3 pick a section; each station shows its key
  const keyed=nav=>[...nav.querySelectorAll('a.ring-item')];
- for(const nav of [main,proj])keyed(nav).forEach((a,i)=>{const k=a.querySelector('.ring-key');if(k)k.textContent=i+1});
+ keyed(main).forEach((a,i)=>{const k=a.querySelector('.ring-key');if(k)k.textContent=i+1});
  document.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey||e.target.closest('input,textarea,select,[contenteditable]'))return;
-  const n=+e.key;if(!(n>=1&&n<=9))return;const a=keyed(ring.dataset.view==='projects'?proj:main)[n-1];if(!a)return;
+  const n=+e.key;if(!(n>=1&&n<=9))return;const a=keyed(main)[n-1];if(!a)return;
   e.preventDefault();a.focus({preventScroll:true});a.click()})}
 language(lang);
 })();

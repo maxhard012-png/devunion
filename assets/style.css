@@ -98,9 +98,6 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .crumb-head{margin:8px 10px 2px;font:500 10.5px/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
 .crumb-head:first-child{margin-top:4px}
 /* home: "Our projects" joins the path while the dial is turned to the projects */
-.crumb-projview{display:none;align-items:center}
-.view-projects .crumb-projview{display:flex}
-.view-projects .crumbs > .crumb-step{display:none}
 /* the language and theme switchers are native selects dressed as chips: keyboard, screen readers and phones get their own picker */
 .picks{display:flex;gap:8px;margin-left:auto}
 .pick{width:auto;font:500 12px/1 var(--mono);color:var(--ink2);
@@ -121,7 +118,7 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 /* ── shared pieces ──────────────────────────────────────────────────── */
 .eyebrow{font:500 11px/1.3 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--fish)}
 /* Chinese and Korean have no capitals and read badly tracked out */
-:lang(zh) :is(.eyebrow,.ring-label),:lang(ko) :is(.eyebrow,.ring-label){letter-spacing:.02em}
+:lang(zh) .eyebrow,:lang(ko) .eyebrow{letter-spacing:.02em}
 .button{display:inline-flex;align-items:center;gap:8px;font:600 13.5px/1 var(--mono);letter-spacing:.01em;color:var(--water);background:var(--fish);border:0;border-radius:10px;padding:14px 18px;text-decoration:none;cursor:pointer;transition:filter .2s,transform .2s}
 .button:hover{filter:brightness(1.12);transform:translateY(-1px)}
 .reset,.small-link{font:500 13px/1 var(--mono);color:var(--ink2);background:none;border:0;padding:14px 4px;cursor:pointer;text-decoration:none}
@@ -133,7 +130,7 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .page-heading{position:relative;max-width:760px;margin-bottom:clamp(36px,6vh,64px)}
 /* a soft pool of still water behind every block of free-standing copy, so fish passing under it fade instead of fighting
    the letters (a painted veil: a live blur here was re-computed every frame over the moving pond) */
-.ring-title::before,.page-heading::before,.product-hero::before,.group-title::before,.section-title::before{content:"";position:absolute;inset:-60px -120px -50px -90px;z-index:-1;pointer-events:none;
+.page-heading::before,.product-hero::before,.group-title::before,.section-title::before{content:"";position:absolute;inset:-60px -120px -50px -90px;z-index:-1;pointer-events:none;
   background:var(--water);opacity:.75;
   -webkit-mask:radial-gradient(closest-side,#000 50%,transparent);mask:radial-gradient(closest-side,#000 50%,transparent)}
 .page-heading h1,.product-hero h1{margin-top:14px;font:300 clamp(36px,5.4vw,68px)/1.02 var(--display);letter-spacing:-.035em}
@@ -154,7 +151,9 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .ring-word{position:relative;margin:0;line-height:0;color:var(--ink)}
 .ring-word .logo{width:calc(var(--D) * .42);height:auto}   /* the </> mark in the middle of the dial */
 .ring-items{position:absolute;inset:0}
-.ring-item{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(var(--a)) translate(var(--R)) rotate(calc(var(--a) * -1));
+/* a station's place on the dial is plain left/top, never a transform: a browser that dropped the transform for a frame
+   while the hover scale animated drew the button in the middle of the ring, flickering (client video, 2026-11-15) */
+.ring-item{--ang:var(--a);--ox:var(--R);--oy:var(--R);position:absolute;left:calc(50% + cos(var(--ang)) * var(--ox));top:calc(50% + sin(var(--ang)) * var(--oy));translate:-50% -50%;
   display:flex;align-items:center;gap:12px;padding:10px 16px 10px 14px;white-space:nowrap;text-decoration:none;pointer-events:auto;
   background:var(--glass);border:1px solid var(--edge);border-radius:14px;
   transition:background-color .2s,border-color .2s,scale .25s cubic-bezier(.2,.8,.2,1)}
@@ -176,27 +175,6 @@ a.crumb:hover{background:var(--wash);color:var(--ink)}
 .ring-item:hover,.ring-item:focus-visible,.ring-item.is-called{background:var(--glass-strong);border-color:var(--btn-fish);scale:1.05}
 .ring-item:focus-visible{outline-color:var(--btn-fish)}
 
-/* "Our projects" turns the dial over: the four sections fade back, the six projects come out on two arcs, Betting on the
-   left and Web3 on the right, each arc marked on the dial itself */
-.ring-items{transition:opacity .35s,scale .45s cubic-bezier(.2,.8,.2,1),visibility 0s}
-.ring[data-view="main"] .ring-projects,.ring[data-view="projects"] .ring-main{opacity:0;visibility:hidden;scale:.9;transition:opacity .25s,scale .35s,visibility 0s .35s}
-.ring-span{position:absolute;inset:0;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .45s;
-  background:conic-gradient(from var(--from),var(--ink2) 0deg 90deg,transparent 90deg);
-  -webkit-mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 4px) calc(100% - 1px),transparent 100%);
-  mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 4px) calc(100% - 1px),transparent 100%)}
-.ring-span-betting{--from:225deg}
-.ring-span-web3{--from:45deg}
-.ring[data-view="projects"] .ring-span{opacity:.6}
-.ring-word{transition:opacity .3s}
-.ring[data-view="projects"] .ring-word{opacity:0}
-.ring-sub{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s .3s}
-.ring[data-view="projects"] .ring-sub{opacity:1;visibility:visible;transition:opacity .3s .1s}
-.ring-title{position:relative;font:300 calc(var(--D) * .075)/1 var(--display);letter-spacing:-.04em}
-.ring-back{margin-top:18px;font:500 12px/1 var(--mono);color:var(--ink2);background:var(--glass);border:1px solid var(--edge2);border-radius:999px;padding:9px 14px;cursor:pointer;pointer-events:auto;
-  }
-.ring-back:hover{color:var(--ink);border-color:var(--ink3)}
-.ring-label{position:absolute;left:50%;top:50%;margin:0;transform:translate(-50%,-50%) rotate(var(--a)) translate(calc(var(--R) + 30px)) rotate(calc(var(--a) * -1));
-  font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);white-space:nowrap}
 .ring-item.is-soon{cursor:default;border-style:dashed;background:var(--wash)}
 .ring-item.is-soon:hover{scale:none;background:var(--wash);border-color:var(--edge2)}
 
@@ -280,19 +258,9 @@ textarea{resize:vertical;min-height:92px}
   .crumb-home span{display:none}
   .ring{--D:min(76vw,300px)}
   .ring-word .logo{width:calc(var(--D) * .56)}   /* on the phone grid a smaller mark has strokes only two tiles wide */
-  .ring-item{transform:translate(-50%,-50%) rotate(var(--am)) translate(var(--R)) rotate(calc(var(--am) * -1));padding:8px 12px 8px 10px;gap:8px}
+  .ring-item{--ang:var(--am);padding:8px 12px 8px 10px;gap:8px}
   .ring-text small{display:none}
   .ring-text b{font-size:14px}
-  /* six stations do not fit round a 300px dial: on a phone the projects stand on a tall oval instead, Betting arched
-     over the top and Web3 under the bottom, each direction's label beyond its arc. --am is the angle on that oval */
-  .ring[data-view="projects"] .ring-span{display:none}
-  .ring-title{font-size:26px}
-  .ring-back{margin-top:12px}
-  .ring-projects{--rx:min(25vw,100px);--ry:calc(var(--R) + 26px)}
-  .ring-projects .ring-item,.ring-projects .ring-label{transform:translate(-50%,-50%) translate(calc(cos(var(--am)) * var(--rx)),calc(sin(var(--am)) * var(--ry)))}
-  .ring-projects .ring-item{padding:8px 11px;gap:6px}
-  .ring-projects .ring-text small{display:block;font-size:10px}
-  .ring-projects .ring-label{--rx:0px;--ry:calc(var(--R) + 74px)}
   .catalog-row{grid-template-columns:minmax(0,1fr) 40px;padding:16px}
   .row-note{grid-column:1;grid-row:2}
   .catalog-row .card-go{grid-column:2;grid-row:1}
@@ -301,6 +269,7 @@ textarea{resize:vertical;min-height:92px}
 @media (prefers-reduced-motion:reduce){
   .ring-main .ring-item{animation:none}
   .theme-toggle .knob{transition:none}
-  .ring-item,.ring-items,.ring-span,.ring-sub,.ring-word,.card-go,.catalog-row,.button{transition:none}
-  .ring-item:hover,.button:hover{transform:none}
+  .ring-item,.card-go,.catalog-row,.button{transition:none}
+  .ring-item:hover{scale:none}
+  .button:hover{transform:none}
 }
